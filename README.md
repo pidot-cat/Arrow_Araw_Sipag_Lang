@@ -1,64 +1,54 @@
-🏹 Arrow Araw: Sipag Lang
+# 🏹 Arrow Araw: Sipag Lang
 A vibrant arrow puzzle escape mobile game built with Flutter.
 
-✨ Features
+---
 
-📱 Application Screens
+## ✨ Features
 
-Splash Screen - Animated app entry with the official Main Logo.
+### 📱 Application Screens
 
-Login Screen - Secure user authentication via Supabase.
+- Splash Screen - Animated app entry with the official Main Logo.
+- Login Screen - Secure user authentication via Supabase.
+- Sign Up Screen - New user registration and cloud profile creation.
+- Home Screen - The main navigation hub with Welcome message.
+- Level Select Screen - Dynamic map featuring 10+ difficulty tiers.
 
-Sign Up Screen - New user registration and cloud profile creation.
+#### 🎮 Game Levels
 
-Home Screen - The main navigation hub with Welcome message.
+- Game Screen Level 1 - 5x5 grid shape Heart.
+- Game Screen Level 2 - 6x6 grid shape Circle.
+- Game Screen Level 3 - 7x7 grid shape Triangle.
+- Game Screen Level 4 - 8x8 grid shape Square.
+- Game Screen Level 5 - 9x9 grid shape Pentagon.
+- Game Screen Level 6 - 10x10 grid shape Hexagon.
+- Game Screen Level 7 - 11x11 grid shape Heptagon.
+- Game Screen Level 8 - 12x12 grid shape Octagon.
+- Game Screen Level 9 - 13x13 grid shape Nonagon.
+- Game Screen Level 10 - 14x14 grid shape Decagon.
 
-Level Select Screen - Dynamic map featuring 10+ difficulty tiers.
+#### ⚙️ Other Screens
 
-Game Screen Level 1 - 5x5 grid shape Heart.
+- Settings Screen - App configuration and account management.
+- Records Screen - Real-time statistics (Wins/Losses) synced from the cloud.
+- About Screen - Development mission and version info (v1.0.0).
+- Contact Screen - Support channel for user inquiries.
+- Privacy Policy Screen - Data protection and Supabase storage terms.
+- Terms of Service Screen - User guidelines and app rules.
 
-Game Screen Level 2 - 6x6 grid shape Circle.
+---
 
-Game Screen Level 3 - 7x7 grid shape Triangle.
+## 🎯 Core Gameplay Mechanics
 
-Game Screen Level 4 - 8x8 grid shape Square.
+- Supabase Integration – Real-time database for user records and cloud-based authentication.
+- Immersive Audio – Menu music and in-game sound effects using audioplayers.
+- Advanced Animations – Smooth UI transitions and pulsing effects via flutter_animate.
+- Statistics Tracking – Automated tracking of Wins, Losses, and Matches.
 
-Game Screen Level 5 - 9x9 grid shape Pentagon.
+---
 
-Game Screen Level 6 - 10x10 grid shape Hexagon.
+## 📂 Project Structure
 
-Game Screen Level 7 - 11x11 grid shape Heptagon.
-
-Game Screen Level 8 - 12x12 grid shape Octagon.
-
-Game Screen Level 9 - 13x13 grid shape Nonagon.
-
-Game Screen Level 10 - 14x14 grid shape Decagon.
-
-Settings Screen - App configuration and account management.
-
-Records Screen - Real-time statistics (Wins/Losses) synced from the cloud.
-
-About Screen - Development mission and version info (v1.0.0).
-
-Contact Screen - Support channel for user inquiries.
-
-Privacy Policy Screen - Data protection and Supabase storage terms.
-
-Terms of Service Screen - User guidelines and app rules.
-
-🎯 Core Gameplay Mechanics
-
-Supabase Integration – Real-time database for user records and cloud-based authentication.
-
-Immersive Audio – Menu music and in-game sound effects using audioplayers.
-
-Advanced Animations – Smooth UI transitions and pulsing effects via flutter_animate.
-
-Statistics Tracking – Automated tracking of Wins, Losses, and Matches.
-
-📂 Project Structure
-
+```
 lib/
 ├── levels/
 │   ├── game_screen_lvl_1.dart
@@ -104,28 +94,32 @@ lib/
 │   ├── life_indicator.dart
 │   └── victory_overlay.dart
 └── main.dart
+```
 
-🛠️ Technology Stack
-Framework: Flutter (Dart) 
+---
 
-Backend: Supabase 
+## 🛠️ Technology Stack
 
-State Management: Provider 
+- Framework: Flutter (Dart)
+- Backend: Supabase
+- State Management: Provider
+- Animations: Flutter Animate
+- Audio: Audioplayers
+- Design: Figma & Canva
 
-Animations: Flutter Animate 
+---
 
-Audio: Audioplayers 
+## 🏗️ Architecture & Logic
 
-Design: Figma & Canva 
-
-🏗️ Architecture & Logic
-State Management
+### State Management
 The app utilizes the Provider Pattern to separate business logic from the UI. GameProvider handles the grid state and statistics, while AuthProvider manages the secure connection to Supabase.
 
-Data Persistence
-Cloud Storage: High scores and profiles are stored in Supabase.
+### Data Persistence
+- Cloud Storage: High scores and profiles are stored in Supabase.
+- Local Storage: SharedPreferences is used for fast local session handling.
 
-Local Storage: SharedPreferences is used for fast local session handling.
+---
 
-👨‍💻 About the Developer
+## 👨‍💻 About the Developer
+
 Developed by a student of Urdaneta City University. This project is a practical application of advanced mobile development, emphasizing the philosophy: Sipag Lang (Hard Work Only).

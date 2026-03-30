@@ -2,9 +2,7 @@
 A vibrant arrow puzzle escape mobile game built with Flutter.
 
 ✨ Features
-
 📱 Application Screens
-
 Splash Screen - Animated app entry with the official Main Logo.
 
 Login Screen - Secure user authentication via Supabase.
@@ -15,25 +13,25 @@ Home Screen - The main navigation hub with Welcome message.
 
 Level Select Screen - Dynamic map featuring 10+ difficulty tiers (Heart to Decagon).
 
-Game Screen Level 1 - 5x5 grid shape Heart
+Game Screen Level 1 - 5x5 grid shape Heart.
 
-Game Screen Level 2 - 6x6 grid shape Circle
+Game Screen Level 2 - 6x6 grid shape Circle.
 
-Game Screen Level 3 - 7x7 grid shape Triangle
+Game Screen Level 3 - 7x7 grid shape Triangle.
 
-Game Screen Level 4 - 8x8 grid shape Square
+Game Screen Level 4 - 8x8 grid shape Square.
 
-Game Screen Level 5 - 9x9 grid shape Pentagon
+Game Screen Level 5 - 9x9 grid shape Pentagon.
 
-Game Screen Level 6- 10x10 grid shape Hexagon
+Game Screen Level 6 - 10x10 grid shape Hexagon.
 
-Game Screen Level 7- 11x11 grid shape Heptagon
+Game Screen Level 7 - 11x11 grid shape Heptagon.
 
-Game Screen Level 8- 12x12 grid shape Octagon
+Game Screen Level 8 - 12x12 grid shape Octagon.
 
-Game Screen Level 9- 13x13 grid shape Nonagon
+Game Screen Level 9 - 13x13 grid shape Nonagon.
 
-Game Screen Level 10- 14x14 grid shape Decagon
+Game Screen Level 10 - 14x14 grid shape Decagon.
 
 Settings Screen - App configuration and account management.
 
@@ -48,19 +46,17 @@ Privacy Policy Screen - Data protection and Supabase storage terms.
 Terms of Service Screen - User guidelines and app rules.
 
 🎯 Core Gameplay Mechanics
+Supabase Integration – Real-time database for user records and cloud-based authentication.
 
-🔐 Supabase Integration – Real-time database for user records and cloud-based authentication.
+Immersive Audio – Menu music and in-game sound effects using audioplayers.
 
-🎵 Immersive Audio – Menu music and in-game sound effects using audioplayers.
+Advanced Animations – Smooth UI transitions and pulsing effects via flutter_animate.
 
-🧪 Advanced Animations – Smooth UI transitions and pulsing effects via flutter_animate.
-
-📊 Statistics Tracking – Automated tracking of Wins, Losses, and Matches.
+Statistics Tracking – Automated tracking of Wins, Losses, and Matches.
 
 📂 Project Structure
-
 lib/
-├── levels/ (Mula sa Image 1000034502.jpg)
+├── levels/
 │   ├── game_screen_lvl_1.dart
 │   ├── game_screen_lvl_2.dart
 │   ├── game_screen_lvl_3.dart
@@ -71,16 +67,13 @@ lib/
 │   ├── game_screen_lvl_8.dart
 │   ├── game_screen_lvl_9.dart
 │   └── game_screen_lvl_10.dart
-│
-├── models/ (Mula sa Image 1000034503.jpg)
+├── models/
 │   ├── arrow_model.dart
 │   └── game_stats_model.dart
-│
-├── providers/ (Mula sa Image 1000034504.jpg)
+├── providers/
 │   ├── auth_provider.dart
 │   └── game_provider.dart
-│
-├── screens/ (Mula sa Image 1000034505.jpg)
+├── screens/
 │   ├── about_screen.dart
 │   ├── contact_screen.dart
 │   ├── game_screen.dart
@@ -93,25 +86,21 @@ lib/
 │   ├── signup_screen.dart
 │   ├── splash_screen.dart
 │   └── terms_screen.dart
-│
-├── services/ (Mula sa Image 1000034506.jpg)
+├── services/
 │   ├── audio_service.dart
 │   └── supabase_service.dart
-│
-├── utils/ (Mula sa Image 1000034507.jpg)
+├── utils/
 │   ├── app_colors.dart
 │   └── constants.dart
-│
-├── widgets/ (Mula sa Image 1000034508.jpg)
+├── widgets/
 │   ├── background_wrapper.dart
 │   ├── game_over_overlay.dart
 │   ├── gradient_button.dart
 │   ├── gradient_input_field.dart
 │   ├── life_indicator.dart
 │   └── victory_overlay.dart
-│
-└── main.dart 
- 
+└── main.dart
+
 🛠️ Technology Stack
 Framework: Flutter (Dart) 🐦
 

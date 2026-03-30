@@ -27,8 +27,8 @@ class AppConstants {
   static const String keyIsLoggedIn = 'is_logged_in';
 
   // Asset Paths — Images
-  static const String logoWithBg = 'assets/images/LOGO WITH BACKGROUND.png';
-  static const String logo = 'assets/images/logo.png';
+  static const String logoWithBg = 'assets/images/LOGO.png';
+  static const String logo = 'assets/images/MainLogo.png';
   static const String background = 'assets/images/background.png';
   static const String heartRed = 'assets/images/heart icon Red.png';
   static const String heartBlack = 'assets/images/heart icon Black.png';

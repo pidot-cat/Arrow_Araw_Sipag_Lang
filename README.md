@@ -2,7 +2,9 @@
 A vibrant arrow puzzle escape mobile game built with Flutter.
 
 ✨ Features
+
 📱 Application Screens
+
 Splash Screen - Animated app entry with the official Main Logo.
 
 Login Screen - Secure user authentication via Supabase.
@@ -11,7 +13,7 @@ Sign Up Screen - New user registration and cloud profile creation.
 
 Home Screen - The main navigation hub with Welcome message.
 
-Level Select Screen - Dynamic map featuring 10+ difficulty tiers (Heart to Decagon).
+Level Select Screen - Dynamic map featuring 10+ difficulty tiers.
 
 Game Screen Level 1 - 5x5 grid shape Heart.
 
@@ -46,6 +48,7 @@ Privacy Policy Screen - Data protection and Supabase storage terms.
 Terms of Service Screen - User guidelines and app rules.
 
 🎯 Core Gameplay Mechanics
+
 Supabase Integration – Real-time database for user records and cloud-based authentication.
 
 Immersive Audio – Menu music and in-game sound effects using audioplayers.
@@ -55,6 +58,7 @@ Advanced Animations – Smooth UI transitions and pulsing effects via flutter_an
 Statistics Tracking – Automated tracking of Wins, Losses, and Matches.
 
 📂 Project Structure
+
 lib/
 ├── levels/
 │   ├── game_screen_lvl_1.dart
@@ -102,17 +106,17 @@ lib/
 └── main.dart
 
 🛠️ Technology Stack
-Framework: Flutter (Dart) 🐦
+Framework: Flutter (Dart) 
 
-Backend: Supabase (PostgreSQL & Auth) ⚡
+Backend: Supabase 
 
-State Management: Provider 🏗️
+State Management: Provider 
 
-Animations: Flutter Animate 🧪
+Animations: Flutter Animate 
 
-Audio: Audioplayers 🔊
+Audio: Audioplayers 
 
-Design: Figma & Canva 🎨
+Design: Figma & Canva 
 
 🏗️ Architecture & Logic
 State Management

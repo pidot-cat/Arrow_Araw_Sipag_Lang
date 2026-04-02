@@ -18,10 +18,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   await Supabase.initialize(
     url: 'https://ibmfuatpdwamxslzmdfe.supabase.co',
-    anonKey: '*****',
+    anonKey: 'sb_publishable_tlXQH89uv5o1BGCWvK6OCQ_RxePEa29',
   );
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

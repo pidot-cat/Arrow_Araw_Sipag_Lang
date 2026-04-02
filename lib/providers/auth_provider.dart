@@ -72,7 +72,7 @@ class AuthProvider with ChangeNotifier {
     String confirmPassword,
     String username,
   ) async {
-    if (password != confirmPassword || password.length < 6) return false;
+    if (password != confirmPassword || password.length < 8) return false;
 
     try {
       final response = await SupabaseService.signUp(email, password, username);

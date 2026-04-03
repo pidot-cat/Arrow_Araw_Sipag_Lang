@@ -32,12 +32,10 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-
-  # 🔥 ADD THIS (App Icon Generator)
   flutter_launcher_icons: ^0.14.4
 
-# 🔥 ADD THIS (ICON CONFIG)
-flutter_icons:
+# ✅ FIXED: flutter_icons → flutter_launcher_icons (tamang key para gumana ang icon generator)
+flutter_launcher_icons:
   android: true
   image_path: "assets/images/MainLogo.jpg"
   adaptive_icon_background: "#000000"

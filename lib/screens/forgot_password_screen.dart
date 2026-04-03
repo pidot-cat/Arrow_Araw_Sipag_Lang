@@ -5,6 +5,7 @@ import '../widgets/gradient_button.dart';
 import '../widgets/gradient_input_field.dart';
 import '../utils/constants.dart';
 import '../services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Forgot Password — 3-step flow
 /// Step 1 → Enter Email
@@ -84,7 +85,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await SupabaseService.sendOtp(email);
+      // ✅ FIXED: Gumagamit ng sendRecoveryOtp (shouldCreateUser: false)
+      await SupabaseService.sendRecoveryOtp(email);
       _verifiedEmail = email;
       _startTimer();
       setState(() => _step = 2);
@@ -102,7 +104,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     if (_timerSeconds > 0) return;
     setState(() => _isLoading = true);
     try {
-      await SupabaseService.sendOtp(_verifiedEmail);
+      // ✅ FIXED: Gumagamit ng sendRecoveryOtp para sa resend
+      await SupabaseService.sendRecoveryOtp(_verifiedEmail);
       _startTimer();
       _showSnack('Code resent to $_verifiedEmail', Colors.green);
     } catch (e) {
@@ -122,7 +125,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final isValid = await SupabaseService.verifyOtp(_verifiedEmail, code);
+      // ✅ FIXED: OtpType.recovery ang gamitin para sa forgot password
+      final isValid = await SupabaseService.verifyOtp(
+        _verifiedEmail,
+        code,
+        type: OtpType.recovery,
+      );
       if (!mounted) return;
 
       if (isValid) {

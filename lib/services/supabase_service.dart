@@ -20,6 +20,16 @@ class SupabaseService {
     );
   }
 
+  /// Sends a recovery OTP to the given email for Forgot Password flow.
+  /// shouldCreateUser is false — we only send to EXISTING accounts.
+  static Future<void> sendRecoveryOtp(String email) async {
+    await _client.auth.signInWithOtp(
+      email: email,
+      shouldCreateUser: false, // ✅ Hindi mag-create ng bagong user
+      emailRedirectTo: null,
+    );
+  }
+
   /// Signs up the user. Call AFTER OTP is verified.
   /// We use signUp here so that metadata (username) is stored.
   static Future<AuthResponse> signUp(
@@ -32,13 +42,16 @@ class SupabaseService {
   }
 
   /// Verifies the OTP that Supabase sent to the email.
+  /// Use OtpType.email for Sign Up, OtpType.recovery for Forgot Password.
   /// Returns true if valid, false if wrong/expired.
-  static Future<bool> verifyOtp(String email, String token) async {
+  static Future<bool> verifyOtp(String email, String token,
+      {OtpType type = OtpType.email}) async {
     try {
       final response = await _client.auth.verifyOTP(
         email: email,
         token: token,
-        type: OtpType.email,
+        type:
+            type, // ✅ Dynamic — email para signup, recovery para forgot password
       );
       return response.user != null;
     } catch (e) {

@@ -22,7 +22,10 @@ void main() async {
 
   await Supabase.initialize(
     url: 'https://ibmfuatpdwamxslzmdfe.supabase.co',
-    anonKey: 'sb_publishable_tlXQH89uv5o1BGCWvK6OCQ_RxePEa29',
+    // ✅ FIXED: Palitan ng iyong TUNAY na anon key mula sa Supabase Dashboard.
+    // Pumunta sa: Supabase Dashboard → Project → Project Settings → API
+    // Kunin ang "anon / public" key — nagsisimula ito sa "eyJ..."
+    anonKey: 'ILAGAY_DITO_ANG_IYONG_SUPABASE_ANON_KEY',
   );
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

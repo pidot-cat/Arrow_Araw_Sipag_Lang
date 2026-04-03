@@ -28,13 +28,14 @@ class AppConstants {
 
   // Asset Paths — Images
   static const String logoWithBg = 'assets/images/LOGO.png';
-  static const String logo = 'assets/images/MainLogo.png';
+  static const String logo =
+      'assets/images/MainLogo.jpg'; // ✅ FIXED: .png → .jpg
   static const String background = 'assets/images/background.png';
   static const String heartRed = 'assets/images/heart icon Red.png';
   static const String heartBlack = 'assets/images/heart icon Black.png';
   static const String gameOver = 'assets/images/Game Over.png';
   static const String victory = 'assets/images/Victory.png';
-  static const String backButton = 'assets/images/Back Button Icon.png';
+  // ✅ FIXED: Removed backButton asset constant — walang file, ginagamit na built-in icon
 
   // Asset Paths — Sounds
   static const String soundArrow = 'assets/sounds/Arrow-Sound.mp3';

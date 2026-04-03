@@ -41,11 +41,11 @@ class BackgroundWrapper extends StatelessWidget {
                       borderRadius: BorderRadius.circular(
                           MediaQuery.of(context).size.width * 0.03),
                     ),
-                    child: Image.asset(
-                      AppConstants.backButton,
-                      width: MediaQuery.of(context).size.width * 0.06,
-                      height: MediaQuery.of(context).size.width * 0.06,
+                    // ✅ FIXED: Replaced missing Image.asset with built-in Icon
+                    child: Icon(
+                      Icons.arrow_back_ios,
                       color: Colors.white,
+                      size: MediaQuery.of(context).size.width * 0.06,
                     ),
                   ),
                 ),

@@ -57,6 +57,7 @@ A vibrant arrow puzzle escape mobile game built with Flutter.
 
 ## 📂 Project Structure
 
+```text
 lib/
 ├── levels/
 │   ├── game_screen_lvl_1.dart
@@ -103,6 +104,7 @@ lib/
 │   ├── life_indicator.dart
 │   └── victory_overlay.dart
 └── main.dart
+```
 
 ## 🛠️ Technology Stack
 

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
+import 'screens/forgot_password_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/records_screen.dart';
 import 'screens/settings_screen.dart';
@@ -57,6 +58,7 @@ class ArrowArawSipagLang extends StatelessWidget {
           '/': (context) => const SplashScreen(),
           '/login': (context) => const LoginScreen(),
           '/signup': (context) => const SignUpScreen(),
+          '/forgot-password': (context) => const ForgotPasswordScreen(),
           '/home': (context) => const HomeScreen(),
           '/records': (context) => const RecordsScreen(),
           '/settings': (context) => const SettingsScreen(),

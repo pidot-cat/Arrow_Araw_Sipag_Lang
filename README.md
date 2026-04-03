@@ -1,15 +1,14 @@
 # 🏹 Arrow Araw: Sipag Lang
 A vibrant arrow puzzle escape mobile game built with Flutter.
 
----
-
 ## ✨ Features
 
 ### 📱 Application Screens
 
 - Splash Screen - Animated app entry with the official Main Logo.
 - Login Screen - Secure user authentication via Supabase.
-- Sign Up Screen - New user registration and cloud profile creation.
+- Sign Up Screen - New user registration with OTP email verification.
+- Forgot Password Screen - 3-step account recovery via OTP email verification.
 - Home Screen - The main navigation hub with Welcome message.
 - Level Select Screen - Dynamic map featuring 10+ difficulty tiers.
 
@@ -35,20 +34,29 @@ A vibrant arrow puzzle escape mobile game built with Flutter.
 - Privacy Policy Screen - Data protection and Supabase storage terms.
 - Terms of Service Screen - User guidelines and app rules.
 
----
-
 ## 🎯 Core Gameplay Mechanics
 
 - Supabase Integration – Real-time database for user records and cloud-based authentication.
+- OTP Email Verification – 6-digit code sent to email for Sign Up and Forgot Password flows.
 - Immersive Audio – Menu music and in-game sound effects using audioplayers.
 - Advanced Animations – Smooth UI transitions and pulsing effects via flutter_animate.
 - Statistics Tracking – Automated tracking of Wins, Losses, and Matches.
 
----
+## 🔐 Authentication Flow
+
+### Sign Up
+1. Fill in Username, Password, Confirm Password, and Email.
+2. Tap **Send** to receive a 6-digit OTP code via email.
+3. Enter the code and tap **Sign Up** to create your account.
+
+### Forgot Password
+1. **Step 1** — Enter your registered email address.
+2. **Step 2** — Enter the 6-digit OTP code sent to your email.
+3. **Step 3** — Set and confirm your new password.
+4. Redirects back to Login upon success.
 
 ## 📂 Project Structure
 
-```
 lib/
 ├── levels/
 │   ├── game_screen_lvl_1.dart
@@ -70,6 +78,7 @@ lib/
 ├── screens/
 │   ├── about_screen.dart
 │   ├── contact_screen.dart
+│   ├── forgot_password_screen.dart
 │   ├── game_screen.dart
 │   ├── home_screen.dart
 │   ├── level_select_screen.dart
@@ -94,9 +103,6 @@ lib/
 │   ├── life_indicator.dart
 │   └── victory_overlay.dart
 └── main.dart
-```
-
----
 
 ## 🛠️ Technology Stack
 
@@ -107,8 +113,6 @@ lib/
 - Audio: Audioplayers
 - Design: Figma & Canva
 
----
-
 ## 🏗️ Architecture & Logic
 
 ### State Management
@@ -117,8 +121,6 @@ The app utilizes the Provider Pattern to separate business logic from the UI. Ga
 ### Data Persistence
 - Cloud Storage: High scores and profiles are stored in Supabase.
 - Local Storage: SharedPreferences is used for fast local session handling.
-
----
 
 ## 👨‍💻 About the Developer
 

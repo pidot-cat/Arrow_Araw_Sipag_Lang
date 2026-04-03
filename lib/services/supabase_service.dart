@@ -16,6 +16,7 @@ class SupabaseService {
     await _client.auth.signInWithOtp(
       email: email,
       shouldCreateUser: true, // creates the user if they don't exist yet
+      emailRedirectTo: null, // sends plain 6-digit code only, no magic link
     );
   }
 
@@ -61,6 +62,14 @@ class SupabaseService {
   /// Sends a password reset email. User receives a link/OTP to reset.
   static Future<void> sendPasswordReset(String email) async {
     await _client.auth.resetPasswordForEmail(email);
+  }
+
+  /// Updates the password of the currently authenticated user.
+  /// Call this AFTER OTP has been verified (user is signed in via OTP).
+  static Future<void> updatePassword(String newPassword) async {
+    await _client.auth.updateUser(
+      UserAttributes(password: newPassword),
+    );
   }
 
   // ── Game Stats ───────────────────────────────────────────────────────────

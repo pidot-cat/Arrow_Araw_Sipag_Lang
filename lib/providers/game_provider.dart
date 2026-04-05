@@ -1,8 +1,5 @@
 // lib/providers/game_provider.dart
-// FIX Bug 2: Added stopLevel() — call this before Navigator.pop() to prevent
-// the timer from firing playLoseSound() after the screen is gone.
-// Each level screen's LevelStateMixin manages its OWN timer. GameProvider's
-// timer is only used by the legacy GameScreen (kept for compatibility).
+// Manages game stats, level state, and audio — shared across all screens.
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -223,11 +220,11 @@ class GameProvider with ChangeNotifier {
   void playGameMusic() => _audioService.playGameMusic();
   void resumeMenuMusic() => _audioService.resumeMenuMusic();
 
+  // Called by LevelStateMixin after victory — saves stats only (audio handled by level).
   void recordLevelComplete(
       {required int level, required int time, required int lives}) {
     _stats.addWin();
     _saveStats();
-    _audioService.playWinSound();
     notifyListeners();
   }
 

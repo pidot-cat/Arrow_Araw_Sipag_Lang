@@ -189,7 +189,6 @@ class _GameScreenLvl9State extends State<GameScreenLvl9>
   @override int get levelNumber => 9;
   @override int get rows => _rows;
   @override int get cols => _cols;
-  @override String get shapeName => 'Nonagon';
   @override List<ArrowData> Function() get buildArrowsFn => _buildArrows;
   @override Widget Function() get nextLevelBuilder => () => const GameScreenLvl10();
 
@@ -201,15 +200,33 @@ class _GameScreenLvl9State extends State<GameScreenLvl9>
 
   @override
   Widget build(BuildContext context) {
-    return buildLevelScaffold(
-      context: context,
-      shapeCells: _shapeCells,
-      gameOverWidget: gameOver
-          ? GameOverOverlay(onRetry: restart, onBack: quit)
-          : const SizedBox.shrink(),
-      victoryWidget: victory
-          ? VictoryOverlay(isLastLevel: false, onNext: goNextLevel, onBack: quit)
-          : const SizedBox.shrink(),
+    final cellSize = (MediaQuery.of(context).size.width * 0.88) / _cols;
+    return Scaffold(
+      backgroundColor: AppColors.darkNavy,
+      body: Stack(children: [
+        SafeArea(
+          child: Column(children: [
+            buildHUD(),
+            const SizedBox(height: 6),
+            _label(),
+            const SizedBox(height: 10),
+            Expanded(
+              child: Center(child: buildGrid(cellSize, _shapeCells)),
+            ),
+          ]),
+        ),
+        if (gameOver) GameOverOverlay(onRetry: restart, onBack: quit),
+        if (victory)
+          VictoryOverlay(isLastLevel: false, onNext: goNextLevel, onBack: quit),
+      ]),
     );
   }
+
+  Widget _label() => Text(
+    'Level 9 · Nonagon · 13×13',
+    style: TextStyle(
+      color: Colors.white.withValues(alpha: 0.5),
+      fontSize: 13,
+      letterSpacing: 1.2),
+  );
 }

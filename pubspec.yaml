@@ -1,7 +1,7 @@
 name: arrow_araw_sipag_lang
 description: A colorful arrow puzzle escape mobile game
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

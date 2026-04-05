@@ -16,6 +16,9 @@ jobs:
           flutter-version: '3.29.3'
           channel: 'stable'
 
+      - name: Fix flutter_lints version
+        run: flutter pub add dev:flutter_lints:^5.0.0
+
       - name: Install dependencies
         run: flutter pub get
 

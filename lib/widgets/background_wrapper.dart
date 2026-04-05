@@ -36,10 +36,8 @@ class BackgroundWrapper extends StatelessWidget {
                   child: Container(
                     padding: EdgeInsets.all(
                         MediaQuery.of(context).size.width * 0.02),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withAlpha((0.5 * 255).toInt()),
-                      borderRadius: BorderRadius.circular(
-                          MediaQuery.of(context).size.width * 0.03),
+                    decoration: const BoxDecoration(
+                      color: Colors.transparent, // Removed black background
                     ),
                     // ✅ FIXED: Replaced missing Image.asset with built-in Icon
                     child: Icon(
@@ -56,7 +54,7 @@ class BackgroundWrapper extends StatelessWidget {
                 left: 0,
                 right: 0,
                 child: Center(
-                  child: Image.asset(AppConstants.logo,
+                  child: Image.asset(AppConstants.logoWithBg,
                       height: MediaQuery.of(context).size.height * 0.1),
                 ),
               ),

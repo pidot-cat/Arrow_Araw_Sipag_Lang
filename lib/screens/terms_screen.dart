@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/background_wrapper.dart';
+import '../utils/constants.dart';
 
 class TermsScreen extends StatelessWidget {
   const TermsScreen({super.key});
@@ -10,20 +11,30 @@ class TermsScreen extends StatelessWidget {
     return Scaffold(
       body: BackgroundWrapper(
         showBackButton: true,
-        showLogo: true,
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(height: size.height * 0.1),
-              const Center(
-                child: Text(
-                  'Terms of Service',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold),
+              // Standard top gap with logo
+              Center(
+                child: Column(
+                  children: [
+                    SizedBox(height: size.height * 0.055),
+                    Image.asset(AppConstants.logoWithBg,
+                        width: 160, height: 160),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Terms of Service',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),
@@ -42,11 +53,11 @@ class TermsScreen extends StatelessWidget {
               _buildSection('Modifications',
                   'We reserve the right to modify or replace these Terms at any time.'),
               _buildSection('Contact Information',
-                  'For questions about these Terms, please contact us at support@arrowaraw.com'),
+                  'For questions about these Terms, please contact us at arrowarawsipaglang@gmail.com'),
               const SizedBox(height: 16),
               Center(
                 child: Text(
-                  'Last Updated: February 2026',
+                  'Last Updated: April 2026',
                   style: TextStyle(
                       color: Colors.white.withAlpha(128),
                       fontSize: 13,

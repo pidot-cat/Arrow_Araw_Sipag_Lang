@@ -16,12 +16,10 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen>
-    with TickerProviderStateMixin {
+class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   final AudioService _audioService = AudioService();
   late AnimationController _pulseController;
 
-  // Settings overlay state
   bool _showSettingsOverlay = false;
   late AnimationController _settingsController;
   late Animation<Offset> _settingsSlide;
@@ -94,9 +92,32 @@ class _GameScreenState extends State<GameScreen>
     final size = MediaQuery.of(context).size;
 
     return PopScope(
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) {
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldPop = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A2E),
+            title: const Text('Leave Game?',
+                style: TextStyle(color: Colors.white)),
+            content: const Text('Your progress in this level will be lost.',
+                style: TextStyle(color: Colors.white70)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Stay', style: TextStyle(color: Colors.cyan)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Leave', style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        );
+        if (shouldPop == true && context.mounted) {
           _audioService.stopGameMusic();
+          Navigator.pop(context);
         }
       },
       child: Consumer<GameProvider>(
@@ -114,7 +135,6 @@ class _GameScreenState extends State<GameScreen>
               child: SafeArea(
                 child: Stack(
                   children: [
-                    // Main game column
                     Column(
                       children: [
                         _buildTopBar(context, game, size),
@@ -127,17 +147,14 @@ class _GameScreenState extends State<GameScreen>
                         _buildBottomHint(size),
                       ],
                     ),
-
-                    // In-game Settings Overlay (slides from top)
                     if (_showSettingsOverlay) ...[
                       Positioned.fill(
                         child: GestureDetector(
                           onTap: _toggleSettingsOverlay,
                           child: FadeTransition(
                             opacity: _settingsFade,
-                            child: Container(
-                              color: Colors.black.withAlpha(120),
-                            ),
+                            child:
+                                Container(color: Colors.black.withAlpha(120)),
                           ),
                         ),
                       ),
@@ -151,8 +168,6 @@ class _GameScreenState extends State<GameScreen>
                         ),
                       ),
                     ],
-
-                    // Game Over overlay — Loss sound plays here only
                     if (game.isGameOver)
                       GameOverOverlay(
                         onRetry: () {
@@ -164,10 +179,9 @@ class _GameScreenState extends State<GameScreen>
                           Navigator.pop(context);
                         },
                       ),
-
-                    // Victory overlay — Win sound plays here only
                     if (game.isLevelWon)
                       VictoryOverlay(
+                        isLastLevel: game.currentLevel >= 10,
                         onNext: () {
                           _audioService.playGameMusic();
                           game.nextLevel();
@@ -187,24 +201,44 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  // Top Bar: Back (LEFT) | Center info | Settings (RIGHT) — swapped per spec
   Widget _buildTopBar(BuildContext context, GameProvider game, Size size) {
     return Padding(
-      padding:
-          EdgeInsets.symmetric(horizontal: size.width * 0.03, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: size.width * 0.03, vertical: 8),
       child: Row(
         children: [
-          // ← Back button is now on the LEFT
           _buildIconBtn(
             icon: Icons.arrow_back_ios_new,
-            onTap: () {
-              _audioService.stopGameMusic();
-              Navigator.pop(context);
+            onTap: () async {
+              final shouldLeave = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: const Color(0xFF1A1A2E),
+                  title: const Text('Leave Game?',
+                      style: TextStyle(color: Colors.white)),
+                  content: const Text(
+                      'Your progress in this level will be lost.',
+                      style: TextStyle(color: Colors.white70)),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Stay',
+                          style: TextStyle(color: Colors.cyan)),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Leave',
+                          style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+              if (shouldLeave == true && context.mounted) {
+                _audioService.stopGameMusic();
+                Navigator.pop(context);
+              }
             },
             size: size,
           ),
-
-          // Center: level name + difficulty badge + lives
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -230,15 +264,14 @@ class _GameScreenState extends State<GameScreen>
                             .withAlpha(50),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: _getDifficultyColor(game.currentLevel),
-                          width: 1,
-                        ),
+                            color: _getDifficultyColor(game.currentLevel),
+                            width: 1),
                       ),
                       child: Text(
                         _getDifficultyText(game.currentLevel),
                         style: TextStyle(
                           color: _getDifficultyColor(game.currentLevel),
-                          fontSize: size.width * 0.03,
+                          fontSize: size.width * 0.025,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -250,8 +283,6 @@ class _GameScreenState extends State<GameScreen>
               ],
             ),
           ),
-
-          // ⚙ Settings button is now on the RIGHT
           _buildIconBtn(
             icon: Icons.settings,
             onTap: _toggleSettingsOverlay,
@@ -263,11 +294,9 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  // Animated settings panel — slides down from top when Settings tapped
   Widget _buildSettingsPanel(Size size) {
     return Container(
-      margin: EdgeInsets.fromLTRB(
-          size.width * 0.06, 8, size.width * 0.06, 0),
+      margin: EdgeInsets.fromLTRB(size.width * 0.06, 8, size.width * 0.06, 0),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -275,28 +304,23 @@ class _GameScreenState extends State<GameScreen>
         border: Border.all(color: Colors.white.withAlpha(30), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(140),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
+              color: Colors.black.withAlpha(140),
+              blurRadius: 24,
+              offset: const Offset(0, 10)),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'SETTINGS',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                  letterSpacing: 1.8,
-                ),
-              ),
+              const Text('SETTINGS',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      letterSpacing: 1.8)),
               GestureDetector(
                 onTap: _toggleSettingsOverlay,
                 child: Icon(Icons.close,
@@ -305,15 +329,17 @@ class _GameScreenState extends State<GameScreen>
             ],
           ),
           const SizedBox(height: 14),
-          // Music toggle
           _buildAnimatedToggle(
             label: 'Music',
             icon: Icons.music_note_rounded,
             value: _audioService.isMusicOn,
-            onChanged: (_) => setState(() => _audioService.toggleMusic()),
+            // toggleMusic is now async — pause/resume instead of stop/restart
+            onChanged: (_) async {
+              await _audioService.toggleMusic();
+              setState(() {});
+            },
           ),
           const SizedBox(height: 10),
-          // Sound FX toggle
           _buildAnimatedToggle(
             label: 'Sound FX',
             icon: Icons.volume_up_rounded,
@@ -325,7 +351,6 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  // Smooth animated toggle: 260ms easeInOut track + thumb slide
   Widget _buildAnimatedToggle({
     required String label,
     required IconData icon,
@@ -334,7 +359,6 @@ class _GameScreenState extends State<GameScreen>
   }) {
     const dur = Duration(milliseconds: 260);
     const curve = Curves.easeInOut;
-
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -342,13 +366,11 @@ class _GameScreenState extends State<GameScreen>
           children: [
             Icon(icon, color: AppColors.cyan, size: 20),
             const SizedBox(width: 10),
-            Text(
-              label,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500),
-            ),
+            Text(label,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500)),
           ],
         ),
         GestureDetector(
@@ -364,11 +386,8 @@ class _GameScreenState extends State<GameScreen>
                   ? AppColors.cyan.withAlpha(180)
                   : Colors.white.withAlpha(40),
               border: Border.all(
-                color: value
-                    ? AppColors.cyan
-                    : Colors.white.withAlpha(60),
-                width: 1.5,
-              ),
+                  color: value ? AppColors.cyan : Colors.white.withAlpha(60),
+                  width: 1.5),
             ),
             child: Stack(
               alignment: Alignment.center,
@@ -384,16 +403,14 @@ class _GameScreenState extends State<GameScreen>
                     margin: const EdgeInsets.symmetric(horizontal: 3),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: value
-                          ? AppColors.cyan
-                          : Colors.white.withAlpha(200),
+                      color:
+                          value ? AppColors.cyan : Colors.white.withAlpha(200),
                       boxShadow: [
                         BoxShadow(
-                          color: value
-                              ? AppColors.cyan.withAlpha(130)
-                              : Colors.black.withAlpha(60),
-                          blurRadius: 4,
-                        ),
+                            color: value
+                                ? AppColors.cyan.withAlpha(130)
+                                : Colors.black.withAlpha(60),
+                            blurRadius: 4)
                       ],
                     ),
                     child: Center(
@@ -403,12 +420,11 @@ class _GameScreenState extends State<GameScreen>
                           value ? 'ON' : 'OFF',
                           key: ValueKey(value),
                           style: TextStyle(
-                            fontSize: 7,
-                            fontWeight: FontWeight.bold,
-                            color: value
-                                ? Colors.black.withAlpha(180)
-                                : Colors.white.withAlpha(180),
-                          ),
+                              fontSize: 7,
+                              fontWeight: FontWeight.bold,
+                              color: value
+                                  ? Colors.black.withAlpha(180)
+                                  : Colors.white.withAlpha(180)),
                         ),
                       ),
                     ),
@@ -422,12 +438,11 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  Widget _buildIconBtn({
-    required IconData icon,
-    required VoidCallback onTap,
-    required Size size,
-    bool highlighted = false,
-  }) {
+  Widget _buildIconBtn(
+      {required IconData icon,
+      required VoidCallback onTap,
+      required Size size,
+      bool highlighted = false}) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -440,16 +455,13 @@ class _GameScreenState extends State<GameScreen>
               : Colors.white.withAlpha(20),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: highlighted
-                ? AppColors.cyan.withAlpha(180)
-                : Colors.white.withAlpha(40),
-          ),
+              color: highlighted
+                  ? AppColors.cyan.withAlpha(180)
+                  : Colors.white.withAlpha(40)),
         ),
-        child: Icon(
-          icon,
-          color: highlighted ? AppColors.cyan : Colors.white,
-          size: size.width * 0.055,
-        ),
+        child: Icon(icon,
+            color: highlighted ? AppColors.cyan : Colors.white,
+            size: size.width * 0.055),
       ),
     );
   }
@@ -461,10 +473,8 @@ class _GameScreenState extends State<GameScreen>
         : game.timeLeft > 10
             ? Colors.orange
             : Colors.red;
-
     return Padding(
-      padding:
-          EdgeInsets.symmetric(horizontal: size.width * 0.04, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: size.width * 0.04, vertical: 4),
       child: Column(
         children: [
           Row(
@@ -475,13 +485,12 @@ class _GameScreenState extends State<GameScreen>
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 300),
                 style: TextStyle(
-                  color: timerColor,
-                  fontSize: game.timeLeft <= 10
-                      ? size.width * 0.06
-                      : size.width * 0.045,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Roboto',
-                ),
+                    color: timerColor,
+                    fontSize: game.timeLeft <= 10
+                        ? size.width * 0.06
+                        : size.width * 0.045,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Roboto'),
                 child: Text('${game.timeLeft}s'),
               ),
             ],
@@ -530,42 +539,30 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Widget _buildArrowWidget(ArrowModel arrow, double cellSize, Size size) {
-    IconData icon;
     Offset escapeTarget;
-
     switch (arrow.direction) {
       case ArrowDirection.up:
-        icon = Icons.arrow_upward_rounded;
         escapeTarget = Offset(0, -(size.height));
         break;
       case ArrowDirection.down:
-        icon = Icons.arrow_downward_rounded;
         escapeTarget = Offset(0, size.height);
         break;
       case ArrowDirection.left:
-        icon = Icons.arrow_back_rounded;
         escapeTarget = Offset(-size.width, 0);
         break;
       case ArrowDirection.right:
-        icon = Icons.arrow_forward_rounded;
         escapeTarget = Offset(size.width, 0);
         break;
       case ArrowDirection.white:
-        icon = Icons.circle;
         escapeTarget = Offset.zero;
         break;
     }
 
-    final double margin = cellSize * 0.08;
-    final double iconSize = cellSize * 0.65;
-
     return _AnimatedArrow(
-      key: ValueKey('${arrow.x}_${arrow.y}_${arrow.direction}'),
+      key: ValueKey(arrow.segments.map((s) => '${s.x},${s.y}').join('|') +
+          arrow.direction.toString()),
       arrow: arrow,
       cellSize: cellSize,
-      margin: margin,
-      icon: icon,
-      iconSize: iconSize,
       escapeTarget: escapeTarget,
       onTap: () => context.read<GameProvider>().tapArrow(arrow),
     );
@@ -577,36 +574,26 @@ class _GameScreenState extends State<GameScreen>
       child: Text(
         'TAP ARROWS TO CLEAR THE PATH',
         style: TextStyle(
-          fontSize: size.width * 0.032,
-          color: Colors.white.withAlpha(80),
-          letterSpacing: 1.5,
-        ),
+            fontSize: size.width * 0.032,
+            color: Colors.white.withAlpha(80),
+            letterSpacing: 1.5),
       ),
     );
   }
 }
 
-// ─── Animated Arrow Widget ────────────────────────────────────────────────────
-
 class _AnimatedArrow extends StatefulWidget {
   final ArrowModel arrow;
   final double cellSize;
-  final double margin;
-  final IconData icon;
-  final double iconSize;
   final Offset escapeTarget;
   final VoidCallback onTap;
 
-  const _AnimatedArrow({
-    super.key,
-    required this.arrow,
-    required this.cellSize,
-    required this.margin,
-    required this.icon,
-    required this.iconSize,
-    required this.escapeTarget,
-    required this.onTap,
-  });
+  const _AnimatedArrow(
+      {super.key,
+      required this.arrow,
+      required this.cellSize,
+      required this.escapeTarget,
+      required this.onTap});
 
   @override
   State<_AnimatedArrow> createState() => _AnimatedArrowState();
@@ -621,12 +608,9 @@ class _AnimatedArrowState extends State<_AnimatedArrow>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 200),
-    );
-    _scaleAnim = Tween<double>(begin: 1.0, end: 0.88).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+        vsync: this, duration: const Duration(milliseconds: 200));
+    _scaleAnim = Tween<double>(begin: 1.0, end: 0.92)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -638,29 +622,33 @@ class _AnimatedArrowState extends State<_AnimatedArrow>
   @override
   Widget build(BuildContext context) {
     final arrow = widget.arrow;
-    final left = arrow.x * widget.cellSize;
-    final top = arrow.y * widget.cellSize;
+
+    int minX = arrow.segments.map((s) => s.x).reduce((a, b) => a < b ? a : b);
+    int minY = arrow.segments.map((s) => s.y).reduce((a, b) => a < b ? a : b);
+    int maxX = arrow.segments.map((s) => s.x).reduce((a, b) => a > b ? a : b);
+    int maxY = arrow.segments.map((s) => s.y).reduce((a, b) => a > b ? a : b);
+
+    double width = (maxX - minX + 1) * widget.cellSize;
+    double height = (maxY - minY + 1) * widget.cellSize;
+    double left = minX * widget.cellSize;
+    double top = minY * widget.cellSize;
 
     if (arrow.isEscaping) {
       return TweenAnimationBuilder<Offset>(
-        tween: Tween<Offset>(
-          begin: Offset.zero,
-          end: widget.escapeTarget,
-        ),
+        tween: Tween<Offset>(begin: Offset.zero, end: widget.escapeTarget),
         duration: const Duration(milliseconds: 400),
         curve: Curves.easeIn,
-        builder: (context, offset, child) {
+        builder: (context, offsetVal, child) {
           return Positioned(
-            left: left + offset.dx,
-            top: top + offset.dy,
-            width: widget.cellSize,
-            height: widget.cellSize,
+            left: left + offsetVal.dx,
+            top: top + offsetVal.dy,
+            width: width,
+            height: height,
             child: Opacity(
               opacity: (1.0 -
-                      (offset.distance /
-                          (widget.escapeTarget.distance + 1)))
+                      (offsetVal.distance / (widget.escapeTarget.distance + 1)))
                   .clamp(0.0, 1.0),
-              child: _arrowBody(arrow),
+              child: _arrowBody(arrow, width, height, minX, minY),
             ),
           );
         },
@@ -670,8 +658,8 @@ class _AnimatedArrowState extends State<_AnimatedArrow>
     return Positioned(
       left: left,
       top: top,
-      width: widget.cellSize,
-      height: widget.cellSize,
+      width: width,
+      height: height,
       child: GestureDetector(
         onTapDown: (_) => _controller.forward(),
         onTapUp: (_) {
@@ -681,41 +669,119 @@ class _AnimatedArrowState extends State<_AnimatedArrow>
         onTapCancel: () => _controller.reverse(),
         child: AnimatedBuilder(
           animation: _scaleAnim,
-          builder: (context, child) => Transform.scale(
-            scale: _scaleAnim.value,
-            child: child,
-          ),
-          child: _arrowBody(arrow),
+          builder: (context, child) =>
+              Transform.scale(scale: _scaleAnim.value, child: child),
+          child: _arrowBody(arrow, width, height, minX, minY),
         ),
       ),
     );
   }
 
-  Widget _arrowBody(ArrowModel arrow) {
-    return Container(
-      margin: EdgeInsets.all(widget.margin),
-      decoration: BoxDecoration(
-        color: arrow.color.withAlpha(60),
-        borderRadius: BorderRadius.circular(widget.cellSize * 0.2),
-        border: Border.all(
-          color: arrow.color,
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: arrow.color.withAlpha(80),
-            blurRadius: 6,
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      child: Center(
-        child: Icon(
-          widget.icon,
-          color: arrow.color,
-          size: widget.iconSize,
-        ),
+  Widget _arrowBody(
+      ArrowModel arrow, double width, double height, int minX, int minY) {
+    return CustomPaint(
+      size: Size(width, height),
+      painter: LongArrowPainter(
+        segments: arrow.segments,
+        direction: arrow.direction,
+        color: arrow.color,
+        cellSize: widget.cellSize,
+        minX: minX,
+        minY: minY,
+        sizeFactor: arrow.size,
       ),
     );
   }
+}
+
+class LongArrowPainter extends CustomPainter {
+  final List<ArrowSegment> segments;
+  final ArrowDirection direction;
+  final Color color;
+  final double cellSize;
+  final int minX;
+  final int minY;
+  final double sizeFactor;
+
+  LongArrowPainter({
+    required this.segments,
+    required this.direction,
+    required this.color,
+    required this.cellSize,
+    required this.minX,
+    required this.minY,
+    required this.sizeFactor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = cellSize * 0.25 * sizeFactor
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path();
+
+    for (int i = 0; i < segments.length; i++) {
+      double x = (segments[i].x - minX + 0.5) * cellSize;
+      double y = (segments[i].y - minY + 0.5) * cellSize;
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+
+    canvas.drawPath(path, paint);
+
+    final headSegment = segments.last;
+    double headX = (headSegment.x - minX + 0.5) * cellSize;
+    double headY = (headSegment.y - minY + 0.5) * cellSize;
+
+    final headPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final headPath = Path();
+    double headSize = cellSize * 0.4 * sizeFactor;
+
+    headPath.moveTo(0, -headSize / 2);
+    headPath.lineTo(headSize / 2, headSize / 2);
+    headPath.lineTo(-headSize / 2, headSize / 2);
+    headPath.close();
+
+    double angle = 0;
+    switch (direction) {
+      case ArrowDirection.up:
+        angle = 0;
+        break;
+      case ArrowDirection.right:
+        angle = 3.14159 / 2;
+        break;
+      case ArrowDirection.down:
+        angle = 3.14159;
+        break;
+      case ArrowDirection.left:
+        angle = -3.14159 / 2;
+        break;
+      case ArrowDirection.white:
+        break;
+    }
+
+    if (direction != ArrowDirection.white) {
+      canvas.save();
+      canvas.translate(headX, headY);
+      canvas.rotate(angle);
+      canvas.drawPath(headPath, headPaint);
+      canvas.restore();
+    } else {
+      canvas.drawCircle(
+          Offset(headX, headY), cellSize * 0.2 * sizeFactor, headPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

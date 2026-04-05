@@ -22,11 +22,11 @@ dependencies:
   # Icons
   cupertino_icons: ^1.0.2
 
-  # Animations
-  flutter_animate: ^4.2.0
-
   # Audio
   audioplayers: ^6.6.0
+
+  # Animations
+  flutter_animate: ^4.5.0
 
 dev_dependencies:
   flutter_test:
@@ -34,7 +34,6 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
 
-# ✅ FIXED: flutter_icons → flutter_launcher_icons (tamang key para gumana ang icon generator)
 flutter_launcher_icons:
   android: true
   image_path: "assets/images/MainLogo.jpg"

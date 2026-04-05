@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -19,7 +20,6 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    // No background music on splash screen
     _controller = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
@@ -38,14 +38,39 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigateAfterDelay() async {
+    // Wait for the minimum splash duration
     await Future.delayed(AppConstants.splashDuration);
+    
     if (!mounted) return;
+    
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // If AuthProvider is not ready yet, wait for it
+    if (!authProvider.isReady) {
+      await _waitForAuthReady(authProvider);
+    }
+    
+    if (!mounted) return;
+
     if (authProvider.isLoggedIn) {
       Navigator.pushReplacementNamed(context, '/home');
     } else {
       Navigator.pushReplacementNamed(context, '/login');
     }
+  }
+
+  Future<void> _waitForAuthReady(AuthProvider authProvider) async {
+    final completer = Completer<void>();
+    
+    void listener() {
+      if (authProvider.isReady) {
+        authProvider.removeListener(listener);
+        completer.complete();
+      }
+    }
+    
+    authProvider.addListener(listener);
+    return completer.future;
   }
 
   @override
@@ -78,21 +103,18 @@ class _SplashScreenState extends State<SplashScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Logo only — no text per spec
                       Image.asset(
                         AppConstants.logoWithBg,
                         width: size.width * 0.55,
                         height: size.width * 0.55,
                       ),
                       SizedBox(height: size.height * 0.06),
-                      // Loading animation only
                       const SizedBox(
                         width: 48,
                         height: 48,
                         child: CircularProgressIndicator(
                           strokeWidth: 3,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.cyan),
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.cyan),
                         ),
                       ),
                     ],

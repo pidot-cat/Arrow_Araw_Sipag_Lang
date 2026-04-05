@@ -7,10 +7,6 @@ import '../widgets/gradient_input_field.dart';
 import '../utils/constants.dart';
 
 /// Login Screen
-/// ✅ LOGO WITH BACKGROUND.jpg displayed
-/// ✅ Snackbar: "Input Email and Password" (empty) / "Wrong email or password" (fail)
-/// ✅ "Forgot Password?" sends real Supabase reset email
-/// ✅ No background music
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -35,33 +31,33 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Input Email and Password'),
-          backgroundColor: Colors.orange,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showSnackBar('Input Email and Password', Colors.orange);
       return;
     }
 
     setState(() => _isLoading = true);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final success = await authProvider.login(email, password);
+    final result = await authProvider.login(email, password);
     if (!mounted) return;
     setState(() => _isLoading = false);
 
-    if (success) {
+    if (result == null) {
       Navigator.pushReplacementNamed(context, '/home');
+    } else if (result == 'EMAIL_NOT_CONFIRMED') {
+      _showSnackBar('Email not confirmed. Please check your inbox or sign up again.', Colors.red);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Wrong email or password'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showSnackBar(result, Colors.red);
     }
+  }
+
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _handleForgotPassword() {
@@ -80,7 +76,6 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 SizedBox(height: size.height * 0.06),
-                // ✅ LOGO WITH BACKGROUND.jpg
                 Image.asset(
                   AppConstants.logoWithBg,
                   width: size.width * 0.38,
@@ -104,7 +99,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 SizedBox(height: size.height * 0.045),
-                // 🔑 Changed from Username to Email
                 GradientInputField(
                   hintText: 'Email',
                   controller: _emailController,
@@ -118,14 +112,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: true,
                   prefixIcon: Icons.lock,
                 ),
-                // ✅ Forgot Password below fields
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: _handleForgotPassword,
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                     ),
                     child: const Text(
                       'Forgot Password?',
@@ -147,12 +139,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(color: Colors.white.withAlpha(128)),
                     ),
                     GestureDetector(
-                      onTap: () =>
-                          Navigator.pushReplacementNamed(context, '/signup'),
+                      onTap: () => Navigator.pushReplacementNamed(context, '/signup'),
                       child: const Text(
                         'Sign Up',
-                        style: TextStyle(
-                            color: Colors.cyan, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Colors.cyan, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],

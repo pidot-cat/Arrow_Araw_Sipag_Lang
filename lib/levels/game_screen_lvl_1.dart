@@ -1,54 +1,83 @@
+// lib/levels/game_screen_lvl_1.dart
+// Level 1 — 5×5 Grid — Heart Shape
+// Arrows: 13 — verified solvable in order 0→12
+
+import 'package:flutter/material.dart';
+
 import '../utils/app_colors.dart';
-import '../models/arrow_model.dart';
+import '../widgets/game_over_overlay.dart';
+import '../widgets/victory_overlay.dart';
+import 'level_base.dart';
+import 'game_screen_lvl_2.dart';
 
-/// Level 1 – Simple Path (Easy)
-/// Layout: Arrows along the 4 edges of a 5x5 grid
-/// pointing outward — easy to read, good intro level.
-class Level1 {
-  static const int gridSize = 5;
-  static const String shapeName = 'Heart';
+const int _rows = 5, _cols = 5;
 
-  static List<ArrowModel> getArrows() {
-    return [
-      // Top row pointing UP (can escape immediately)
-      ArrowModel(
-          x: 0, y: 0, direction: ArrowDirection.up, color: AppColors.yellow),
-      ArrowModel(
-          x: 1, y: 0, direction: ArrowDirection.up, color: AppColors.cyan),
-      ArrowModel(
-          x: 2, y: 0, direction: ArrowDirection.up, color: AppColors.red),
-      ArrowModel(
-          x: 3, y: 0, direction: ArrowDirection.up, color: AppColors.green),
-      ArrowModel(
-          x: 4, y: 0, direction: ArrowDirection.up, color: AppColors.orange),
+const Set<(int, int)> _shapeCells = {
+  (0, 1),
+  (0, 2),
+  (1, 0),
+  (1, 1),
+  (1, 2),
+  (1, 3),
+  (2, 0),
+  (2, 1),
+  (2, 2),
+  (2, 3),
+  (2, 4),
+  (3, 1),
+  (3, 2),
+  (3, 3),
+  (4, 2),
+};
 
-      // Bottom row pointing DOWN
-      ArrowModel(
-          x: 0, y: 4, direction: ArrowDirection.down, color: AppColors.purple),
-      ArrowModel(
-          x: 1, y: 4, direction: ArrowDirection.down, color: AppColors.yellow),
-      ArrowModel(
-          x: 2, y: 4, direction: ArrowDirection.down, color: AppColors.cyan),
-      ArrowModel(
-          x: 3, y: 4, direction: ArrowDirection.down, color: AppColors.red),
-      ArrowModel(
-          x: 4, y: 4, direction: ArrowDirection.down, color: AppColors.green),
+List<ArrowData> _buildArrows() => [
+  ArrowData(id:0, row:0, col:2, dir:ArrowDir.right, length:1, color:AppColors.arrowRed),
+  ArrowData(id:1, row:0, col:1, dir:ArrowDir.up, length:1, color:AppColors.arrowOrange),
+  ArrowData(id:2, row:1, col:0, dir:ArrowDir.left, length:1, color:AppColors.arrowYellow),
+  ArrowData(id:3, row:1, col:3, dir:ArrowDir.right, length:1, color:AppColors.arrowGreen),
+  ArrowData(id:4, row:1, col:1, dir:ArrowDir.right, length:2, color:AppColors.arrowCyan),
+  ArrowData(id:5, row:2, col:0, dir:ArrowDir.left, length:1, color:AppColors.arrowBlue),
+  ArrowData(id:6, row:2, col:4, dir:ArrowDir.right, length:1, color:AppColors.arrowPurple),
+  ArrowData(id:7, row:2, col:3, dir:ArrowDir.right, length:1, color:AppColors.arrowPink),
+  ArrowData(id:8, row:2, col:1, dir:ArrowDir.right, length:2, color:AppColors.arrowWhite),
+  ArrowData(id:9, row:3, col:1, dir:ArrowDir.left, length:1, color:AppColors.arrowRed),
+  ArrowData(id:10, row:3, col:3, dir:ArrowDir.right, length:1, color:AppColors.arrowOrange),
+  ArrowData(id:11, row:3, col:2, dir:ArrowDir.right, length:1, color:AppColors.arrowYellow),
+  ArrowData(id:12, row:4, col:2, dir:ArrowDir.down, length:1, color:AppColors.arrowGreen),
+];
 
-      // Left column pointing LEFT
-      ArrowModel(
-          x: 0, y: 1, direction: ArrowDirection.left, color: AppColors.orange),
-      ArrowModel(
-          x: 0, y: 2, direction: ArrowDirection.left, color: AppColors.purple),
-      ArrowModel(
-          x: 0, y: 3, direction: ArrowDirection.left, color: AppColors.yellow),
+class GameScreenLvl1 extends StatefulWidget {
+  const GameScreenLvl1({super.key});
+  @override
+  State<GameScreenLvl1> createState() => _GameScreenLvl1State();
+}
 
-      // Right column pointing RIGHT
-      ArrowModel(
-          x: 4, y: 1, direction: ArrowDirection.right, color: AppColors.cyan),
-      ArrowModel(
-          x: 4, y: 2, direction: ArrowDirection.right, color: AppColors.red),
-      ArrowModel(
-          x: 4, y: 3, direction: ArrowDirection.right, color: AppColors.green),
-    ];
+class _GameScreenLvl1State extends State<GameScreenLvl1>
+    with LevelStateMixin<GameScreenLvl1> {
+  @override int get levelNumber => 1;
+  @override int get rows => _rows;
+  @override int get cols => _cols;
+  @override String get shapeName => 'Heart';
+  @override List<ArrowData> Function() get buildArrowsFn => _buildArrows;
+  @override Widget Function() get nextLevelBuilder => () => const GameScreenLvl2();
+
+  @override
+  void initState() {
+    super.initState();
+    initLevelState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return buildLevelScaffold(
+      context: context,
+      shapeCells: _shapeCells,
+      gameOverWidget: gameOver
+          ? GameOverOverlay(onRetry: restart, onBack: quit)
+          : const SizedBox.shrink(),
+      victoryWidget: victory
+          ? VictoryOverlay(isLastLevel: false, onNext: goNextLevel, onBack: quit)
+          : const SizedBox.shrink(),
+    );
   }
 }

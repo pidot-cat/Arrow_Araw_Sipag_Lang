@@ -1,13 +1,22 @@
+// lib/screens/level_select_screen.dart
+// FIX: Bug 1 — Routes to GameScreenLvlX screens directly instead of generic GameScreen.
+// The generic GameScreen has no arrows wired; each level screen owns its own data.
+
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../providers/game_provider.dart';
-import 'game_screen.dart';
+import '../levels/game_screen_lvl_1.dart';
+import '../levels/game_screen_lvl_2.dart';
+import '../levels/game_screen_lvl_3.dart';
+import '../levels/game_screen_lvl_4.dart';
+import '../levels/game_screen_lvl_5.dart';
+import '../levels/game_screen_lvl_6.dart';
+import '../levels/game_screen_lvl_7.dart';
+import '../levels/game_screen_lvl_8.dart';
+import '../levels/game_screen_lvl_9.dart';
+import '../levels/game_screen_lvl_10.dart';
 
 class LevelSelectScreen extends StatelessWidget {
   const LevelSelectScreen({super.key});
 
-  // Spec: L1=Heart, L2=Circle, L3=Triangle, L4=Square, L5=Pentagon,
-  //       L6=Hexagon, L7=Heptagon, L8=Octagon, L9=Nonagon, L10=Decagon
   static const List<String> _levelNames = [
     'Heart',
     'Circle',
@@ -21,7 +30,19 @@ class LevelSelectScreen extends StatelessWidget {
     'Decagon',
   ];
 
-  // Spec: L1=Blue, L2=Green, 3-4=Yellow, 5-6=Orange, 7-8=Red, 9-10=Purple
+  static const List<String> _levelGrids = [
+    '5×5',
+    '6×6',
+    '4×7',
+    '8×8',
+    '9×9',
+    '10×10',
+    '11×11',
+    '12×12',
+    '13×13',
+    '14×14',
+  ];
+
   static const List<Color> _levelColors = [
     Color(0xFF1E88E5), // L1  Blue
     Color(0xFF00C853), // L2  Green
@@ -35,6 +56,34 @@ class LevelSelectScreen extends StatelessWidget {
     Color(0xFFAA00FF), // L10 Purple
   ];
 
+  // FIX: each card navigates directly to the correct level screen with its own data
+  static Widget _levelScreen(int level) {
+    switch (level) {
+      case 1:
+        return const GameScreenLvl1();
+      case 2:
+        return const GameScreenLvl2();
+      case 3:
+        return const GameScreenLvl3();
+      case 4:
+        return const GameScreenLvl4();
+      case 5:
+        return const GameScreenLvl5();
+      case 6:
+        return const GameScreenLvl6();
+      case 7:
+        return const GameScreenLvl7();
+      case 8:
+        return const GameScreenLvl8();
+      case 9:
+        return const GameScreenLvl9();
+      case 10:
+        return const GameScreenLvl10();
+      default:
+        return const GameScreenLvl1();
+    }
+  }
+
   String _getDifficulty(int level) {
     if (level <= 2) return 'Easy';
     if (level <= 4) return 'Normal';
@@ -46,9 +95,7 @@ class LevelSelectScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-
     return Scaffold(
-      // Blue/Black theme
       backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
         title: const Text(
@@ -69,10 +116,7 @@ class LevelSelectScreen extends StatelessWidget {
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(
-            height: 1,
-            color: Colors.white.withAlpha(30),
-          ),
+          child: Container(height: 1, color: Colors.white.withAlpha(30)),
         ),
       ),
       body: Container(
@@ -90,12 +134,11 @@ class LevelSelectScreen extends StatelessWidget {
               crossAxisCount: size.width > 600 ? 4 : 2,
               crossAxisSpacing: 14,
               mainAxisSpacing: 14,
-              childAspectRatio: 1.05,
+              childAspectRatio: 0.95,
             ),
             itemCount: 10,
-            itemBuilder: (context, index) {
-              return _buildLevelCard(context, index + 1);
-            },
+            itemBuilder: (context, index) =>
+                _buildLevelCard(context, index + 1),
           ),
         ),
       ),
@@ -106,15 +149,14 @@ class LevelSelectScreen extends StatelessWidget {
     final color = _levelColors[level - 1];
     final difficulty = _getDifficulty(level);
     final name = _levelNames[level - 1];
+    final grid = _levelGrids[level - 1];
 
     return InkWell(
-      onTap: () {
-        context.read<GameProvider>().initLevel(level);
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const GameScreen()),
-        );
-      },
+      // FIX: navigate to the specific level screen, not GameScreen
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => _levelScreen(level)),
+      ),
       borderRadius: BorderRadius.circular(18),
       splashColor: color.withAlpha(60),
       highlightColor: color.withAlpha(30),
@@ -126,47 +168,39 @@ class LevelSelectScreen extends StatelessWidget {
           border: Border.all(color: color.withAlpha(160), width: 1.8),
           boxShadow: [
             BoxShadow(
-              color: color.withAlpha(80),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
+                color: color.withAlpha(80),
+                blurRadius: 12,
+                offset: const Offset(0, 4)),
           ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              'LVL',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.white.withAlpha(120),
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2,
-              ),
-            ),
-            Text(
-              '$level',
-              style: TextStyle(
-                fontSize: 40,
-                color: color,
-                fontWeight: FontWeight.bold,
-                height: 1.0,
-                shadows: [
-                  Shadow(
-                    color: color.withAlpha(180),
-                    blurRadius: 12,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              name,
-              style: const TextStyle(fontSize: 11, color: Colors.white70),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            Text('LVL',
+                style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.white.withAlpha(120),
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2)),
+            Text('$level',
+                style: TextStyle(
+                    fontSize: 38,
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    height: 1.0,
+                    shadows: [
+                      Shadow(color: color.withAlpha(180), blurRadius: 12)
+                    ])),
+            const SizedBox(height: 3),
+            Text(name,
+                style: const TextStyle(fontSize: 11, color: Colors.white70),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 2),
+            Text(grid,
+                style: TextStyle(
+                    fontSize: 10, color: Colors.white.withAlpha(100))),
             const SizedBox(height: 5),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -175,15 +209,12 @@ class LevelSelectScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: color.withAlpha(80), width: 1),
               ),
-              child: Text(
-                difficulty,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-              ),
+              child: Text(difficulty,
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5)),
             ),
           ],
         ),

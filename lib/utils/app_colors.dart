@@ -40,6 +40,20 @@ class AppColors {
     white,
   ];
 
+  // Arrow Color Aliases (used by level screens)
+  static const Color arrowRed = red;
+  static const Color arrowOrange = orange;
+  static const Color arrowYellow = yellow;
+  static const Color arrowGreen = green;
+  static const Color arrowCyan = cyan;
+  static const Color arrowBlue = Color(0xFF2979FF);
+  static const Color arrowPurple = purple;
+  static const Color arrowPink = pink;
+  static const Color arrowWhite = white;
+
+  // Dark Navy (used for scaffold/dialog backgrounds)
+  static const Color darkNavy = Color(0xFF0D1B2A);
+
   // UI Elements
   static const Color heartRed = Color(0xFFFF1744);
   static const Color heartBlack = Color(0xFF2C2C2C);

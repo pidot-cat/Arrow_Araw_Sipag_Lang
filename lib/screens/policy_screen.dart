@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/background_wrapper.dart';
+import '../utils/constants.dart';
 
 class PolicyScreen extends StatelessWidget {
   const PolicyScreen({super.key});
@@ -10,20 +11,30 @@ class PolicyScreen extends StatelessWidget {
     return Scaffold(
       body: BackgroundWrapper(
         showBackButton: true,
-        showLogo: true,
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(height: size.height * 0.1),
-              const Center(
-                child: Text(
-                  'Privacy Policy',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold),
+              // Standard top gap with logo
+              Center(
+                child: Column(
+                  children: [
+                    SizedBox(height: size.height * 0.055),
+                    Image.asset(AppConstants.logoWithBg,
+                        width: 160, height: 160),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Privacy Policy',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),
@@ -44,11 +55,11 @@ class PolicyScreen extends StatelessWidget {
               _buildSection('Your Rights',
                   'You have the right to access, update, or delete your personal information at any time through the app settings or by contacting us.'),
               _buildSection('Contact Us',
-                  'If you have questions about this Privacy Policy, please contact us at privacy@arrowaraw.com'),
+                  'If you have questions about this Privacy Policy, please contact us at arrowarawsipaglang@gmail.com'),
               const SizedBox(height: 16),
               Center(
                 child: Text(
-                  'Last Updated: February 2026',
+                  'Last Updated: April 2026',
                   style: TextStyle(
                       color: Colors.white.withAlpha(128),
                       fontSize: 13,

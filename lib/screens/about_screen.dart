@@ -16,12 +16,12 @@ class AboutScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             children: [
-              // Reduced top gap
+              // Standard top gap
               SizedBox(height: size.height * 0.055),
               Image.asset(AppConstants.logoWithBg, width: 160, height: 160),
               const SizedBox(height: 16),
               const Text(
-                'Arrow Araw Sipag Lang',
+                'About us',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 26,
@@ -52,14 +52,14 @@ class AboutScreen extends StatelessWidget {
                 'Game Concept',
                 'Navigate colorful arrows through a strategic puzzle board. Each arrow moves '
                     'in its indicated direction, and your goal is to clear the entire board '
-                    'without hitting obstacles. Manage your 3 lives wisely!',
+                    'without hitting arrows. Manage your 3 lives wisely!',
                 Icons.gamepad_rounded,
                 Colors.purple,
               ),
               const SizedBox(height: 16),
               _buildInfoCard(
                 'Development Team',
-                'Created with passion by a dedicated team of developers who love puzzles '
+                'Created with passion by a dedicated student who love puzzles '
                     'and gaming. We continuously work to improve your experience and add new features.',
                 Icons.people_rounded,
                 Colors.orange,
@@ -67,12 +67,11 @@ class AboutScreen extends StatelessWidget {
               const SizedBox(height: 16),
               _buildInfoCard(
                 'Technology',
-                'Built with Flutter for cross-platform compatibility, ensuring smooth performance '
-                    'on both Android and iOS devices. Designed with modern UI/UX principles.',
+                'Built with Flutter for Android-platform, ensuring smooth performance '
+                    'on Android devices. Designed with modern UI/UX principles.',
                 Icons.code_rounded,
                 Colors.green,
               ),
-              // "Connect with us" section REMOVED per spec
               const SizedBox(height: 28),
               Text(
                 '© 2026 Arrow Araw Sipag Lang',
@@ -123,9 +122,7 @@ class AboutScreen extends StatelessWidget {
               Text(
                 title,
                 style: TextStyle(
-                    color: color,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold),
+                    color: color, fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -133,9 +130,7 @@ class AboutScreen extends StatelessWidget {
           Text(
             content,
             style: TextStyle(
-                color: Colors.white.withAlpha(204),
-                fontSize: 14,
-                height: 1.55),
+                color: Colors.white.withAlpha(204), fontSize: 14, height: 1.55),
           ),
         ],
       ),

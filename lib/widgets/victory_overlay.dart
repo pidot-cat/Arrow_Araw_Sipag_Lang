@@ -5,11 +5,13 @@ import '../utils/constants.dart';
 class VictoryOverlay extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback onBack;
+  final bool isLastLevel; // ✅ NEW: true when player finishes Level 10
 
   const VictoryOverlay({
     super.key,
     required this.onNext,
     required this.onBack,
+    this.isLastLevel = false,
   });
 
   @override
@@ -47,50 +49,80 @@ class VictoryOverlay extends StatelessWidget {
               ),
               SizedBox(height: screenHeight * 0.01),
               Text(
-                'Congratulations! You cleared the path!',
+                isLastLevel
+                    ? 'You completed all levels! Amazing!'
+                    : 'Congratulations! You cleared the path!',
                 style: TextStyle(
                   fontSize: screenWidth * 0.038,
                   color: Colors.white.withAlpha(160),
                 ),
               ),
               SizedBox(height: screenHeight * 0.05),
-              ElevatedButton.icon(
-                onPressed: onNext,
-                icon: const Icon(Icons.arrow_forward, color: Colors.white),
-                label: Text(
-                  'NEXT LEVEL',
-                  style: TextStyle(
-                    fontSize: screenWidth * 0.048,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+              // ✅ Show NEXT LEVEL only when there are more levels; otherwise show BACK TO MENU
+              if (!isLastLevel)
+                ElevatedButton.icon(
+                  onPressed: onNext,
+                  icon: const Icon(Icons.arrow_forward, color: Colors.white),
+                  label: Text(
+                    'NEXT LEVEL',
+                    style: TextStyle(
+                      fontSize: screenWidth * 0.048,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: screenWidth * 0.1,
+                      vertical: screenHeight * 0.018,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(screenWidth * 0.04),
+                    ),
+                    elevation: 8,
+                  ),
+                )
+              else
+                ElevatedButton.icon(
+                  onPressed: onBack,
+                  icon: const Icon(Icons.home_rounded, color: Colors.white),
+                  label: Text(
+                    'BACK TO MENU',
+                    style: TextStyle(
+                      fontSize: screenWidth * 0.048,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: screenWidth * 0.1,
+                      vertical: screenHeight * 0.018,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(screenWidth * 0.04),
+                    ),
+                    elevation: 8,
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: screenWidth * 0.1,
-                    vertical: screenHeight * 0.018,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(screenWidth * 0.04),
-                  ),
-                  elevation: 8,
-                ),
-              ),
               SizedBox(height: screenHeight * 0.02),
-              TextButton.icon(
-                onPressed: onBack,
-                icon: Icon(Icons.arrow_back_ios_new,
-                    color: Colors.white.withAlpha(180),
-                    size: screenWidth * 0.04),
-                label: Text(
-                  'BACK',
-                  style: TextStyle(
-                    fontSize: screenWidth * 0.04,
-                    color: Colors.white.withAlpha(180),
+              // ✅ Only show secondary BACK button when not on last level
+              if (!isLastLevel)
+                TextButton.icon(
+                  onPressed: onBack,
+                  icon: Icon(Icons.arrow_back_ios_new,
+                      color: Colors.white.withAlpha(180),
+                      size: screenWidth * 0.04),
+                  label: Text(
+                    'BACK',
+                    style: TextStyle(
+                      fontSize: screenWidth * 0.04,
+                      color: Colors.white.withAlpha(180),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

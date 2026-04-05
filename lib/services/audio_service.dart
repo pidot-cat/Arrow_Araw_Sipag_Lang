@@ -15,16 +15,14 @@ class AudioService {
   bool get isMusicOn => _isMusicOn;
   bool get isSfxOn => _isSfxOn;
 
-  void toggleMusic() {
+  // Pag OFF ang music — i-pause lang (hindi i-stop) para mapanatili ang position.
+  // Pag ON ulit — i-resume mula sa natigil, hindi mag-restart mula sa simula.
+  Future<void> toggleMusic() async {
     _isMusicOn = !_isMusicOn;
     if (!_isMusicOn) {
-      _musicPlayer.stop();
+      await _musicPlayer.pause();
     } else {
-      if (_currentMusic == 'game') {
-        playGameMusic();
-      } else {
-        playMenuMusic();
-      }
+      await _musicPlayer.resume();
     }
   }
 
@@ -34,7 +32,7 @@ class AudioService {
 
   Future<void> playMenuMusic() async {
     if (!_isMusicOn) return;
-    if (_currentMusic == 'menu') return; // already playing, don't restart
+    if (_currentMusic == 'menu') return;
     _currentMusic = 'menu';
     await _musicPlayer.stop();
     await _musicPlayer.setReleaseMode(ReleaseMode.loop);
@@ -43,7 +41,7 @@ class AudioService {
 
   Future<void> playGameMusic() async {
     if (!_isMusicOn) return;
-    if (_currentMusic == 'game') return; // already playing
+    if (_currentMusic == 'game') return;
     _currentMusic = 'game';
     await _musicPlayer.stop();
     await _musicPlayer.setReleaseMode(ReleaseMode.loop);
@@ -51,11 +49,9 @@ class AudioService {
   }
 
   Future<void> stopGameMusic() async {
-    // Call this when leaving game screen — resume menu music
-    _currentMusic = '';
     await _musicPlayer.stop();
     await Future.delayed(const Duration(milliseconds: 200));
-    await playMenuMusic();
+    await resumeMenuMusic();
   }
 
   Future<void> playArrowSound() async {
@@ -80,6 +76,13 @@ class AudioService {
     await _sfxPlayer.play(AssetSource('sounds/Lose-Sound.mp3'));
   }
 
+  Future<void> resumeMenuMusic() async {
+    if (!_isMusicOn) return;
+    _currentMusic = '';
+    await playMenuMusic();
+  }
+
+  // Tinatawag ito pag nag-logout — para walang music sa login/signup screens.
   void stopAll() {
     _musicPlayer.stop();
     _sfxPlayer.stop();

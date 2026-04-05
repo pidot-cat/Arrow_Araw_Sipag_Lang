@@ -28,8 +28,6 @@ class AppConstants {
 
   // Asset Paths — Images
   static const String logoWithBg = 'assets/images/LOGO.png';
-  static const String logo =
-      'assets/images/MainLogo.jpg'; // ✅ FIXED: .png → .jpg
   static const String background = 'assets/images/background.png';
   static const String heartRed = 'assets/images/heart icon Red.png';
   static const String heartBlack = 'assets/images/heart icon Black.png';

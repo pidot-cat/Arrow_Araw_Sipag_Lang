@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../widgets/background_wrapper.dart';
 import '../providers/game_provider.dart';
 import '../utils/app_colors.dart';
+import '../utils/constants.dart';
 
 class RecordsScreen extends StatefulWidget {
   const RecordsScreen({super.key});
@@ -28,24 +29,25 @@ class _RecordsScreenState extends State<RecordsScreen> {
     return Scaffold(
       body: BackgroundWrapper(
         showBackButton: true,
-        showLogo: true,
         child: Consumer<GameProvider>(
           builder: (context, gameProvider, child) {
             return SingleChildScrollView(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Column(
                 children: [
-                  // Shift content up — reduced top spacing
-                  SizedBox(height: size.height * 0.1),
+                  // Standard top gap with logo
+                  SizedBox(height: size.height * 0.055),
+                  Image.asset(AppConstants.logoWithBg, width: 160, height: 160),
+                  const SizedBox(height: 16),
                   const Text(
-                    'Your Records',
+                    'Records',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 30,
+                      fontSize: 26,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.2,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                   SizedBox(height: size.height * 0.03),
                   _buildStatCard(

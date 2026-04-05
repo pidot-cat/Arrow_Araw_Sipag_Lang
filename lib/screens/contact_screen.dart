@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/background_wrapper.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/gradient_input_field.dart';
+import '../utils/constants.dart';
 
 class ContactScreen extends StatefulWidget {
   const ContactScreen({super.key});
@@ -50,25 +51,29 @@ class _ContactScreenState extends State<ContactScreen> {
     return Scaffold(
       body: BackgroundWrapper(
         showBackButton: true,
-        showLogo: true,
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             children: [
-              // Reduced top gap per spec
-              SizedBox(height: size.height * 0.1),
+              // Standard top gap with logo
+              SizedBox(height: size.height * 0.055),
+              Image.asset(AppConstants.logoWithBg, width: 160, height: 160),
+              const SizedBox(height: 16),
               const Text(
-                'Contact Us',
+                'Contact us',
                 style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold),
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 "We're here to help!",
-                style: TextStyle(
-                    color: Colors.white.withAlpha(179), fontSize: 15),
+                style:
+                    TextStyle(color: Colors.white.withAlpha(179), fontSize: 15),
               ),
               SizedBox(height: size.height * 0.035),
               GradientInputField(
@@ -86,8 +91,7 @@ class _ContactScreenState extends State<ContactScreen> {
                 keyboardType: TextInputType.multiline,
               ),
               const SizedBox(height: 30),
-              GradientButton(
-                  text: 'SEND MESSAGE', onPressed: _submitContact),
+              GradientButton(text: 'SEND MESSAGE', onPressed: _submitContact),
               const SizedBox(height: 24),
               Container(
                 padding: const EdgeInsets.all(18),
@@ -115,8 +119,7 @@ class _ContactScreenState extends State<ContactScreen> {
                         Text(
                           'support@arrowaraw.com',
                           style: TextStyle(
-                              color: Colors.white.withAlpha(204),
-                              fontSize: 14),
+                              color: Colors.white.withAlpha(204), fontSize: 14),
                         ),
                       ],
                     ),

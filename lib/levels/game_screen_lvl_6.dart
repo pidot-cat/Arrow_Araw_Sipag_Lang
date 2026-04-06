@@ -141,6 +141,7 @@ class GameScreenLvl6 extends StatefulWidget {
 class _GameScreenLvl6State extends State<GameScreenLvl6>
     with LevelStateMixin<GameScreenLvl6> {
   @override int get levelNumber => 6;
+  @override String get levelDifficulty => 'Medium';
   @override int get rows => _rows;
   @override int get cols => _cols;
   @override List<ArrowData> Function() get buildArrowsFn => _buildArrows;
@@ -161,8 +162,6 @@ class _GameScreenLvl6State extends State<GameScreenLvl6>
         SafeArea(
           child: Column(children: [
             buildHUD(),
-            const SizedBox(height: 6),
-            _label(),
             const SizedBox(height: 10),
             Expanded(
               child: Center(child: buildGrid(cellSize, _shapeCells)),
@@ -176,11 +175,4 @@ class _GameScreenLvl6State extends State<GameScreenLvl6>
     );
   }
 
-  Widget _label() => Text(
-    'Level 6 · Hexagon · 10×10',
-    style: TextStyle(
-      color: Colors.white.withValues(alpha: 0.5),
-      fontSize: 13,
-      letterSpacing: 1.2),
-  );
 }

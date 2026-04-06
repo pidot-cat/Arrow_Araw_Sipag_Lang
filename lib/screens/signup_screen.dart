@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../services/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/background_wrapper.dart';
@@ -21,6 +22,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController _confirmPasswordController =
       TextEditingController();
   final TextEditingController _verificationController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    AudioService().stopAll(); // No music on sign-up screen
+  }
 
   bool _isLoading = false;
   bool _codeSent = false;

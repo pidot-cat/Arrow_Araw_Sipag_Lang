@@ -403,7 +403,8 @@ mixin LevelStateMixin<T extends StatefulWidget> on State<T> {
     if (gameOver || victory || arrow.solved) return;
 
     if (!canSlide(arrow)) {
-      // Wrong tap: shake the arrow and deduct a life (no sound here).
+      // Wrong tap: shake the arrow, deduct a life, and pause game music briefly.
+      _audio.onArrowTap();
       _arrowKeys[arrow.id]?.currentState?.triggerShake();
       setState(() {
         lives--;
@@ -459,51 +460,172 @@ mixin LevelStateMixin<T extends StatefulWidget> on State<T> {
 
   // ── HUD ─────────────────────────────────────────────────────────────────────
   Widget buildHUD() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Lives — tries heart asset images first, falls back to icons.
-          Row(
-            children: List.generate(3, (i) {
-              final active = i < lives;
-              return Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: Image.asset(
-                  active ? AppConstants.heartRed : AppConstants.heartBlack,
-                  width: 28,
-                  height: 28,
-                  errorBuilder: (_, __, ___) => Icon(
-                    active ? Icons.favorite : Icons.favorite_border,
-                    color: active ? Colors.redAccent : Colors.grey,
-                    size: 26,
+    final timerColor = secondsLeft <= 10 ? Colors.redAccent : AppColors.cyan;
+    final progress = secondsLeft / 60.0;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Row 1: Back | Level Title + Badge | Settings
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              // Back button
+              GestureDetector(
+                onTap: quit,
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(30),
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  child: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
                 ),
-              );
-            }),
+              ),
+              // Level + difficulty badge (centered)
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'LEVEL $levelNumber',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.cyan.withAlpha(40),
+                        border: Border.all(color: AppColors.cyan, width: 1.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        levelDifficulty,
+                        style: TextStyle(
+                          color: AppColors.cyan,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Settings button
+              GestureDetector(
+                onTap: openSettings,
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(30),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.settings, color: Colors.white, size: 22),
+                ),
+              ),
+            ],
           ),
-          // Timer.
-          Row(children: [
-            Icon(
-              Icons.timer_rounded,
-              color: secondsLeft <= 10 ? Colors.redAccent : AppColors.cyan,
-              size: 20,
-            ),
+        ),
+
+        // Row 2: Hearts (centered)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(3, (i) {
+            final active = i < lives;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Image.asset(
+                active ? AppConstants.heartRed : AppConstants.heartBlack,
+                width: 30,
+                height: 30,
+                errorBuilder: (_, __, ___) => Icon(
+                  active ? Icons.favorite : Icons.favorite_border,
+                  color: active ? Colors.redAccent : Colors.grey,
+                  size: 28,
+                ),
+              ),
+            );
+          }),
+        ),
+
+        const SizedBox(height: 8),
+
+        // Row 3: Timer text (centered)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.timer_rounded, color: timerColor, size: 18),
             const SizedBox(width: 4),
             AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 200),
               style: TextStyle(
-                color: secondsLeft <= 10 ? Colors.redAccent : Colors.white,
-                fontSize: secondsLeft <= 10 ? 26 : 22,
+                color: timerColor,
+                fontSize: secondsLeft <= 10 ? 22 : 18,
                 fontWeight: FontWeight.bold,
               ),
               child: Text('${secondsLeft}s'),
             ),
-          ]),
-        ],
-      ),
+          ],
+        ),
+
+        const SizedBox(height: 6),
+
+        // Row 4: Timer progress bar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Stack(
+                children: [
+                  // Background track
+                  Container(
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(40),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  // Foreground fill
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 500),
+                    height: 6,
+                    width: constraints.maxWidth * progress.clamp(0.0, 1.0),
+                    decoration: BoxDecoration(
+                      color: timerColor,
+                      borderRadius: BorderRadius.circular(3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: timerColor.withAlpha(120),
+                          blurRadius: 6,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+
+        const SizedBox(height: 4),
+      ],
     );
+  }
+
+  // Override these in each level for custom difficulty label and settings
+  String get levelDifficulty => 'Easy';
+  void openSettings() {
+    // Navigate to settings screen
+    Navigator.pushNamed(context, '/settings');
   }
 
   // ── Grid ─────────────────────────────────────────────────────────────────────

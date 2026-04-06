@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 
 class AudioService {
@@ -6,86 +7,132 @@ class AudioService {
   AudioService._internal();
 
   final AudioPlayer _musicPlayer = AudioPlayer();
-  final AudioPlayer _sfxPlayer = AudioPlayer();
+  final AudioPlayer _sfxPlayer   = AudioPlayer();
 
   bool _isMusicOn = true;
-  bool _isSfxOn = true;
-  String _currentMusic = '';
+  bool _isSfxOn   = true;
+  String _currentMusic = '';   // 'menu' | 'game' | 'win' | 'lose' | ''
+
+  // Idle-resume timer: game music resumes X seconds after last arrow tap
+  Timer? _resumeTimer;
+  static const _resumeDelay = Duration(seconds: 3);
+  bool _gameMusicPaused = false; // true = paused-by-tap (not by toggle)
 
   bool get isMusicOn => _isMusicOn;
-  bool get isSfxOn => _isSfxOn;
+  bool get isSfxOn   => _isSfxOn;
 
-  // Pag OFF ang music — i-pause lang (hindi i-stop) para mapanatili ang position.
-  // Pag ON ulit — i-resume mula sa natigil, hindi mag-restart mula sa simula.
+  // ── Toggle Music ──────────────────────────────────────────────────────────
   Future<void> toggleMusic() async {
     _isMusicOn = !_isMusicOn;
     if (!_isMusicOn) {
+      _resumeTimer?.cancel();
       await _musicPlayer.pause();
     } else {
-      await _musicPlayer.resume();
+      // Resume whatever was playing (if game music was paused by tap, keep it paused)
+      if (!_gameMusicPaused) {
+        await _musicPlayer.resume();
+      }
     }
   }
 
+  // ── Toggle SFX ───────────────────────────────────────────────────────────
   void toggleSfx() {
     _isSfxOn = !_isSfxOn;
   }
 
+  // ── Menu Music (First-Music, looping) ────────────────────────────────────
+  // Call from: HomeScreen, SettingsScreen, RecordsScreen, About/Contact/Terms/Policy
   Future<void> playMenuMusic() async {
-    if (!_isMusicOn) return;
     if (_currentMusic == 'menu') return;
+    _resumeTimer?.cancel();
+    _gameMusicPaused = false;
     _currentMusic = 'menu';
     await _musicPlayer.stop();
     await _musicPlayer.setReleaseMode(ReleaseMode.loop);
-    await _musicPlayer.play(AssetSource('sounds/First-Music.mp3'));
+    if (_isMusicOn) {
+      await _musicPlayer.play(AssetSource('sounds/First-Music.mp3'));
+    }
   }
 
+  // ── Game Music (Second-Music) ─────────────────────────────────────────────
+  // Call from: initLevelState (level screens)
   Future<void> playGameMusic() async {
-    if (!_isMusicOn) return;
-    if (_currentMusic == 'game') return;
+    if (_currentMusic == 'game' && !_gameMusicPaused) return;
+    _resumeTimer?.cancel();
+    _gameMusicPaused = false;
     _currentMusic = 'game';
     await _musicPlayer.stop();
     await _musicPlayer.setReleaseMode(ReleaseMode.loop);
-    await _musicPlayer.play(AssetSource('sounds/Second-Music.mp3'));
+    if (_isMusicOn) {
+      await _musicPlayer.play(AssetSource('sounds/Second-Music.mp3'));
+    }
   }
 
-  Future<void> stopGameMusic() async {
-    await _musicPlayer.stop();
-    await Future.delayed(const Duration(milliseconds: 200));
-    await resumeMenuMusic();
+  // ── Called on every correct/wrong arrow tap ───────────────────────────────
+  // Pauses game music immediately; schedules resume after idle period.
+  Future<void> onArrowTap() async {
+    if (_currentMusic != 'game') return;
+    _resumeTimer?.cancel();
+    if (!_gameMusicPaused) {
+      _gameMusicPaused = true;
+      await _musicPlayer.pause();
+    }
+    // Schedule resume after idle
+    _resumeTimer = Timer(_resumeDelay, _resumeGameMusic);
   }
 
+  Future<void> _resumeGameMusic() async {
+    if (_currentMusic != 'game') return;
+    _gameMusicPaused = false;
+    if (_isMusicOn) {
+      await _musicPlayer.resume();
+    }
+  }
+
+  // ── Arrow tap sound ───────────────────────────────────────────────────────
   Future<void> playArrowSound() async {
     if (!_isSfxOn) return;
     await _sfxPlayer.stop();
     await _sfxPlayer.play(AssetSource('sounds/Arrow-Sound.mp3'));
+    // Also pause/schedule resume for game music
+    await onArrowTap();
   }
 
+  // ── Win Sound ─────────────────────────────────────────────────────────────
   Future<void> playWinSound() async {
-    if (!_isSfxOn) return;
+    _resumeTimer?.cancel();
+    _gameMusicPaused = false;
     _currentMusic = 'win';
     await _musicPlayer.stop();
+    if (!_isSfxOn) return;
     await _sfxPlayer.stop();
     await _sfxPlayer.play(AssetSource('sounds/Win-Sound.mp3'));
   }
 
+  // ── Lose Sound ────────────────────────────────────────────────────────────
   Future<void> playLoseSound() async {
-    if (!_isSfxOn) return;
+    _resumeTimer?.cancel();
+    _gameMusicPaused = false;
     _currentMusic = 'lose';
     await _musicPlayer.stop();
+    if (!_isSfxOn) return;
     await _sfxPlayer.stop();
     await _sfxPlayer.play(AssetSource('sounds/Lose-Sound.mp3'));
   }
 
+  // ── Resume menu music (after level ends / back to lobby) ─────────────────
   Future<void> resumeMenuMusic() async {
-    if (!_isMusicOn) return;
-    _currentMusic = '';
+    _resumeTimer?.cancel();
+    _gameMusicPaused = false;
     await playMenuMusic();
   }
 
-  // Tinatawag ito pag nag-logout — para walang music sa login/signup screens.
+  // ── Stop all (logout) ─────────────────────────────────────────────────────
   void stopAll() {
+    _resumeTimer?.cancel();
+    _gameMusicPaused = false;
+    _currentMusic = '';
     _musicPlayer.stop();
     _sfxPlayer.stop();
-    _currentMusic = '';
   }
 }

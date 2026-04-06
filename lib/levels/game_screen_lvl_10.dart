@@ -612,6 +612,8 @@ class _GameScreenLvl10State extends State<GameScreenLvl10>
   @override
   int get levelNumber => 10;
   @override
+  String get levelDifficulty => 'Hard';
+  @override
   int get rows => _rows;
   @override
   int get cols => _cols;
@@ -635,8 +637,6 @@ class _GameScreenLvl10State extends State<GameScreenLvl10>
         SafeArea(
           child: Column(children: [
             buildHUD(),
-            const SizedBox(height: 6),
-            _label(),
             const SizedBox(height: 10),
             Expanded(
               child: Center(child: buildGrid(cellSize, _shapeCells)),
@@ -650,11 +650,4 @@ class _GameScreenLvl10State extends State<GameScreenLvl10>
     );
   }
 
-  Widget _label() => Text(
-        'Level 10 · Decagon · 14×14',
-        style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.5),
-            fontSize: 13,
-            letterSpacing: 1.2),
-      );
 }

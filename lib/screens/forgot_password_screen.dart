@@ -6,6 +6,7 @@
 // FIX Bug 5: All snackbar messages are now clear, consistent, and contextual.
 
 import 'dart:async';
+import '../services/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/background_wrapper.dart';
@@ -31,6 +32,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   int _timerSeconds = 0;
   Timer? _countdownTimer;
   String _verifiedEmail = '';
+
+  @override
+  void initState() {
+    super.initState();
+    AudioService().stopAll(); // No music on forgot-password screen
+  }
 
   @override
   void dispose() {

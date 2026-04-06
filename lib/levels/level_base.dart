@@ -343,6 +343,9 @@ mixin LevelStateMixin<T extends StatefulWidget> on State<T> {
     _levelTimer?.cancel();
     _audio.playLoseSound();        // sound ONLY on actual game over
     setState(() => gameOver = true);
+    if (mounted) {
+      context.read<GameProvider>().recordLevelLoss();
+    }
   }
 
   void triggerGameOver() => _doGameOver();

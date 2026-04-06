@@ -228,6 +228,13 @@ class GameProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // Called by LevelStateMixin after game over — saves loss stats only (audio handled by level).
+  void recordLevelLoss() {
+    _stats.addLoss();
+    _saveStats();
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _timer?.cancel();

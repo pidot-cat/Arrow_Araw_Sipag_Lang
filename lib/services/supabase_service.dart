@@ -54,7 +54,12 @@ class SupabaseService {
   static Session? get currentSession => _client.auth.currentSession;
 
   static Future<void> sendPasswordReset(String email) async {
-    await _client.auth.resetPasswordForEmail(email);
+    // signInWithOtp with shouldCreateUser: false sends a 6-digit OTP code
+    // via email for recovery, which works with verifyOTP(OtpType.recovery)
+    await _client.auth.signInWithOtp(
+      email: email,
+      shouldCreateUser: false,
+    );
   }
 
   static Future<void> updatePassword(String newPassword) async {

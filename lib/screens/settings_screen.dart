@@ -454,7 +454,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   child: ElevatedButton(
                     onPressed: () => _handleLogout(context),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF8B0000),
+                      backgroundColor: const Color(0xFF271E9A),
                       foregroundColor: Colors.white,
                       padding:
                           const EdgeInsets.symmetric(vertical: 14),
@@ -462,7 +462,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                           borderRadius: BorderRadius.circular(14)),
                       elevation: 4,
                       shadowColor:
-                          const Color(0xFF8B0000).withAlpha(120),
+                          const Color(0xFF271E9A).withAlpha(120),
                     ),
                     child: const Text('LOG OUT',
                         style: TextStyle(

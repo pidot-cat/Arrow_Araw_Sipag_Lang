@@ -152,7 +152,7 @@ class AuthProvider with ChangeNotifier {
       final response = await SupabaseService.verifyOtp(
         email: email,
         token: token,
-        type: OtpType.recovery,
+        type: OtpType.email,
       );
       return (response.user != null && response.session != null)
           ? null
@@ -167,6 +167,8 @@ class AuthProvider with ChangeNotifier {
   Future<String?> updatePassword(String newPassword) async {
     try {
       await SupabaseService.updatePassword(newPassword);
+      // Sign out the recovery session so the user logs in fresh with new password
+      await SupabaseService.signOut();
       return null;
     } on AuthException catch (e) {
       return e.message;

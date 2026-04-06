@@ -1,22 +1,26 @@
 // lib/levels/level_base.dart
 // Shared model, painter, state mixin, and widgets used by every level screen.
+// Arrow style: line/stroke with arrowhead.
+// Animation: smooth slide-out on correct tap, shake on blocked tap.
 
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
 import '../utils/app_colors.dart';
+import '../utils/constants.dart';
 
 enum ArrowDir { up, down, left, right }
 
-// Arrow data — position, direction, size, color, and solved state.
+// ── Arrow Data ────────────────────────────────────────────────────────────────
+// For ALL directions, (row, col) is always the TOP-LEFT corner of the bounding box.
+// cells() expands from that corner based on direction.
 class ArrowData {
   final int id;
-  int row, col;
+  final int row, col;
   final ArrowDir dir;
-  final int length; // cells occupied (1–3)
+  final int length;
   final Color color;
   bool solved;
 
@@ -30,296 +34,119 @@ class ArrowData {
     this.solved = false,
   });
 
-  // All grid cells this arrow occupies.
+  // All grid cells this arrow occupies (row, col pairs).
   List<(int, int)> get cells => List.generate(length, (i) {
-        final r = row +
-            (dir == ArrowDir.down
-                ? i
-                : dir == ArrowDir.up
-                    ? -i
-                    : 0);
-        final c = col +
-            (dir == ArrowDir.right
-                ? i
-                : dir == ArrowDir.left
-                    ? -i
-                    : 0);
-        return (r, c);
+        switch (dir) {
+          case ArrowDir.right: return (row, col + i);
+          case ArrowDir.left:  return (row, col - i);
+          case ArrowDir.down:  return (row + i, col);
+          case ArrowDir.up:    return (row - i, col);
+        }
       });
+
+  // The first cell in the direction of travel (leading edge).
+  // This is the cell just BEYOND the arrow's last occupied cell.
+  (int, int) get leadingEdge {
+    switch (dir) {
+      case ArrowDir.right: return (row, col + length);
+      case ArrowDir.left:  return (row, col - length);
+      case ArrowDir.down:  return (row + length, col);
+      case ArrowDir.up:    return (row - length, col);
+    }
+  }
 }
 
-// Shared mixin for all level screens — timer, lives, tap logic, rendering.
-mixin LevelStateMixin<T extends StatefulWidget> on State<T> {
-  late List<ArrowData> arrows;
-  int lives = 3;
-  int secondsLeft = 60;
-  bool gameOver = false;
-  bool victory = false;
-  bool _levelEnded = false; // guards timer callbacks after dispose/back
-  Timer? _levelTimer;
-  final Map<int, ValueNotifier<int>> animTrigger = {};
+// ── Arrow Painter (Line/Stroke Style) ─────────────────────────────────────────
+class ArrowPainter extends CustomPainter {
+  final ArrowDir dir;
+  final int length;
+  final Color color;
+  final double cellSize;
 
-  final AudioService _audio = AudioService();
+  const ArrowPainter({
+    required this.dir,
+    required this.length,
+    required this.color,
+    required this.cellSize,
+  });
 
-  int get levelNumber;
-  int get rows;
-  int get cols;
-  List<ArrowData> Function() get buildArrowsFn;
-  Widget Function() get nextLevelBuilder;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final strokeW = (cellSize * 0.13).clamp(2.5, 6.0);
 
-  void initLevelState() {
-    arrows = buildArrowsFn();
-    for (final a in arrows) {
-      animTrigger[a.id] = ValueNotifier(0);
+    final shadowPaint = Paint()
+      ..color = Colors.black.withAlpha(100)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeW + 2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeW
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = _buildPath(size, strokeW);
+    canvas.save();
+    canvas.translate(2, 2);
+    canvas.drawPath(path, shadowPaint);
+    canvas.restore();
+    canvas.drawPath(path, paint);
+  }
+
+  Path _buildPath(Size s, double sw) {
+    final path = Path();
+    final pad = sw * 0.8;
+    final headLen = (cellSize * 0.30).clamp(8.0, 22.0);
+    final headWing = (cellSize * 0.20).clamp(5.0, 15.0);
+
+    switch (dir) {
+      case ArrowDir.right:
+        final y = s.height / 2;
+        path.moveTo(pad, y);
+        path.lineTo(s.width - pad, y);
+        path.moveTo(s.width - pad, y);
+        path.lineTo(s.width - pad - headLen, y - headWing);
+        path.moveTo(s.width - pad, y);
+        path.lineTo(s.width - pad - headLen, y + headWing);
+
+      case ArrowDir.left:
+        final y = s.height / 2;
+        path.moveTo(s.width - pad, y);
+        path.lineTo(pad, y);
+        path.moveTo(pad, y);
+        path.lineTo(pad + headLen, y - headWing);
+        path.moveTo(pad, y);
+        path.lineTo(pad + headLen, y + headWing);
+
+      case ArrowDir.down:
+        final x = s.width / 2;
+        path.moveTo(x, pad);
+        path.lineTo(x, s.height - pad);
+        path.moveTo(x, s.height - pad);
+        path.lineTo(x - headWing, s.height - pad - headLen);
+        path.moveTo(x, s.height - pad);
+        path.lineTo(x + headWing, s.height - pad - headLen);
+
+      case ArrowDir.up:
+        final x = s.width / 2;
+        path.moveTo(x, s.height - pad);
+        path.lineTo(x, pad);
+        path.moveTo(x, pad);
+        path.lineTo(x - headWing, pad + headLen);
+        path.moveTo(x, pad);
+        path.lineTo(x + headWing, pad + headLen);
     }
-    _audio.playGameMusic();
-    _startTimer();
+
+    return path;
   }
 
   @override
-  void dispose() {
-    _levelTimer?.cancel();
-    for (final v in animTrigger.values) {
-      v.dispose();
-    }
-    super.dispose();
-  }
-
-  void _startTimer() {
-    _levelEnded = false;
-    _levelTimer?.cancel();
-    _levelTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || _levelEnded) return;
-      setState(() {
-        secondsLeft--;
-        if (secondsLeft <= 0) triggerGameOver();
-      });
-    });
-  }
-
-  void triggerGameOver() {
-    if (_levelEnded) return;
-    _levelEnded = true;
-    _levelTimer?.cancel();
-    _audio.playLoseSound(); // loss sound only on actual game over
-    setState(() => gameOver = true);
-  }
-
-  void triggerVictory() {
-    if (_levelEnded) return;
-    _levelEnded = true;
-    _levelTimer?.cancel();
-    _audio.playWinSound(); // win sound only on actual victory
-    setState(() => victory = true);
-    if (mounted) {
-      context.read<GameProvider>().recordLevelComplete(
-            level: levelNumber,
-            time: 60 - secondsLeft,
-            lives: lives,
-          );
-    }
-  }
-
-  // Returns true if the arrow's escape path is completely clear.
-  bool canSlide(ArrowData arrow) {
-    final occupied = <(int, int)>{};
-    for (final a in arrows) {
-      if (a.id != arrow.id && !a.solved) {
-        for (final cell in a.cells) {
-          occupied.add(cell);
-        }
-      }
-    }
-    final dr = arrow.dir == ArrowDir.down
-        ? 1
-        : arrow.dir == ArrowDir.up
-            ? -1
-            : 0;
-    final dc = arrow.dir == ArrowDir.right
-        ? 1
-        : arrow.dir == ArrowDir.left
-            ? -1
-            : 0;
-    var r = arrow.row + dr * arrow.length;
-    var c = arrow.col + dc * arrow.length;
-    // Walk escape path — any occupied cell blocks the arrow.
-    while (r >= 0 && r < rows && c >= 0 && c < cols) {
-      if (occupied.contains((r, c))) return false;
-      r += dr;
-      c += dc;
-    }
-    return true;
-  }
-
-  // Any arrow can be tapped — player figures out the order.
-  void onTap(ArrowData arrow) {
-    if (gameOver || victory || arrow.solved) return;
-    if (!canSlide(arrow)) {
-      _wrongTap(); // bawas buhay, no sound
-      return;
-    }
-    _audio.playArrowSound();
-    animTrigger[arrow.id]!.value++;
-    Future.delayed(350.ms, () {
-      if (!mounted) return;
-      setState(() {
-        arrow.solved = true;
-        final remaining = arrows.where((a) => !a.solved).length;
-        if (remaining == 0) triggerVictory();
-      });
-    });
-  }
-
-  // Deduct a life on wrong tap — no sound (sound only on actual game over).
-  void _wrongTap() {
-    setState(() {
-      lives--;
-      if (lives <= 0) triggerGameOver();
-    });
-  }
-
-  void restart() {
-    _levelTimer?.cancel();
-    _levelEnded = false;
-    setState(() {
-      arrows = buildArrowsFn();
-      lives = 3;
-      secondsLeft = 60;
-      gameOver = false;
-      victory = false;
-      for (final a in arrows) {
-        animTrigger[a.id]?.value = 0;
-      }
-    });
-    _audio.playGameMusic();
-    _startTimer();
-  }
-
-  void quit() {
-    _levelEnded = true; // stop timer before popping
-    _levelTimer?.cancel();
-    _audio.resumeMenuMusic();
-    Navigator.of(context).popUntil((r) => r.isFirst);
-  }
-
-  void goNextLevel() {
-    _levelEnded = true;
-    _levelTimer?.cancel();
-    Navigator.pushReplacement(
-        context, MaterialPageRoute(builder: (_) => nextLevelBuilder()));
-  }
-
-  // HUD — lives hearts + countdown timer.
-  Widget buildHUD() => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child:
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Row(
-              children: List.generate(
-                  3,
-                  (i) => Icon(
-                      i < lives ? Icons.favorite : Icons.favorite_border,
-                      color: i < lives ? Colors.redAccent : Colors.grey,
-                      size: 26))),
-          Row(children: [
-            Icon(Icons.timer,
-                color: secondsLeft <= 10 ? Colors.redAccent : Colors.cyan,
-                size: 20),
-            const SizedBox(width: 4),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
-              style: TextStyle(
-                  color: secondsLeft <= 10 ? Colors.redAccent : Colors.white,
-                  fontSize: secondsLeft <= 10 ? 26 : 22,
-                  fontWeight: FontWeight.bold),
-              child: Text('${secondsLeft}s'),
-            ),
-          ]),
-        ]),
-      );
-
-  // Grid — shape background tiles + arrow widgets stacked on top.
-  Widget buildGrid(double cellSize, Set<(int, int)> shapeCells) {
-    return Center(
-        child: SizedBox(
-            width: cellSize * cols,
-            height: cellSize * rows,
-            child: Stack(children: [
-              for (int r = 0; r < rows; r++)
-                for (int c = 0; c < cols; c++)
-                  Positioned(
-                      left: c * cellSize,
-                      top: r * cellSize,
-                      width: cellSize,
-                      height: cellSize,
-                      child: Container(
-                          decoration: BoxDecoration(
-                        color: shapeCells.contains((r, c))
-                            ? AppColors.darkNavy.withValues(alpha: 0.6)
-                            : Colors.transparent,
-                        border: shapeCells.contains((r, c))
-                            ? Border.all(color: Colors.white12, width: 0.5)
-                            : null,
-                      ))),
-              for (final a in arrows)
-                if (!a.solved) _buildArrow(a, cellSize),
-            ])));
-  }
-
-  Widget _buildArrow(ArrowData arrow, double cellSize) {
-    final isHoriz = arrow.dir == ArrowDir.left || arrow.dir == ArrowDir.right;
-    final w = isHoriz ? cellSize * arrow.length : cellSize;
-    final h = isHoriz ? cellSize : cellSize * arrow.length;
-    double left = arrow.col * cellSize;
-    double top = arrow.row * cellSize;
-    if (arrow.dir == ArrowDir.up) top -= (arrow.length - 1) * cellSize;
-    if (arrow.dir == ArrowDir.left) left -= (arrow.length - 1) * cellSize;
-
-    // Slide-out offset for the exit animation.
-    final so = switch (arrow.dir) {
-      ArrowDir.right => const Offset(1.5, 0),
-      ArrowDir.left  => const Offset(-1.5, 0),
-      ArrowDir.up    => const Offset(0, -1.5),
-      ArrowDir.down  => const Offset(0, 1.5),
-    };
-
-    return Positioned(
-        left: left,
-        top: top,
-        width: w,
-        height: h,
-        child: ValueListenableBuilder<int>(
-          valueListenable: animTrigger[arrow.id]!,
-          builder: (_, trigger, child) => GestureDetector(
-              onTap: () => onTap(arrow),
-              child: trigger == 0
-                  ? child!
-                  : child!
-                      .animate(key: ValueKey(trigger))
-                      .slideX(
-                          begin: 0,
-                          end: isHoriz ? so.dx : 0,
-                          duration: 300.ms,
-                          curve: Curves.easeIn)
-                      .slideY(
-                          begin: 0,
-                          end: !isHoriz ? so.dy : 0,
-                          duration: 300.ms,
-                          curve: Curves.easeIn)
-                      .fadeOut(
-                          begin: 1,
-                          duration: 300.ms,
-                          curve: Curves.easeIn)),
-          child: ArrowWidget(
-              dir: arrow.dir,
-              length: arrow.length,
-              color: arrow.color,
-              cellSize: cellSize),
-        ));
-  }
+  bool shouldRepaint(covariant ArrowPainter old) =>
+      old.color != color || old.dir != dir || old.length != length;
 }
-
-// ── Arrow Widget ──────────────────────────────────────────────────────────────
 
 class ArrowWidget extends StatelessWidget {
   final ArrowDir dir;
@@ -341,74 +168,404 @@ class ArrowWidget extends StatelessWidget {
           dir: dir, length: length, color: color, cellSize: cellSize));
 }
 
-// Arrow painter — draws the filled arrow shape with drop shadow.
-class ArrowPainter extends CustomPainter {
-  final ArrowDir dir;
-  final int length;
-  final Color color;
+// ── Animated Arrow Widget ─────────────────────────────────────────────────────
+class AnimatedArrowWidget extends StatefulWidget {
+  final ArrowData arrow;
   final double cellSize;
+  final VoidCallback onTap;
 
-  const ArrowPainter({
-    required this.dir,
-    required this.length,
-    required this.color,
+  const AnimatedArrowWidget({
+    super.key,
+    required this.arrow,
     required this.cellSize,
+    required this.onTap,
   });
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final fill = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    final stroke = Paint()
-      ..color = Colors.white24
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    final pad   = cellSize * 0.15;
-    final shaft = cellSize * 0.22;
-    final head  = cellSize * 0.36;
-    final path  = _buildPath(size, pad, shaft, head);
-    canvas.drawPath(
-        path.shift(const Offset(2, 2)), Paint()..color = Colors.black38);
-    canvas.drawPath(path, fill);
-    canvas.drawPath(path, stroke);
-  }
+  State<AnimatedArrowWidget> createState() => AnimatedArrowWidgetState();
+}
 
-  Path _buildPath(Size s, double pad, double shaft, double head) {
-    final path    = Path();
-    final isHoriz = dir == ArrowDir.left || dir == ArrowDir.right;
-    if (isHoriz) {
-      final midY    = s.height / 2;
-      final flip    = dir == ArrowDir.left;
-      final start   = flip ? s.width - pad : pad;
-      final end     = flip ? pad : s.width - pad;
-      final headEnd = flip ? head + pad : s.width - head - pad;
-      path.moveTo(start, midY - shaft);
-      path.lineTo(headEnd, midY - shaft);
-      path.lineTo(headEnd, midY - head);
-      path.lineTo(end, midY);
-      path.lineTo(headEnd, midY + head);
-      path.lineTo(headEnd, midY + shaft);
-      path.lineTo(start, midY + shaft);
-    } else {
-      final midX    = s.width / 2;
-      final flip    = dir == ArrowDir.up;
-      final start   = flip ? s.height - pad : pad;
-      final end     = flip ? pad : s.height - pad;
-      final headEnd = flip ? head + pad : s.height - head - pad;
-      path.moveTo(midX - shaft, start);
-      path.lineTo(midX - shaft, headEnd);
-      path.lineTo(midX - head, headEnd);
-      path.lineTo(midX, end);
-      path.lineTo(midX + head, headEnd);
-      path.lineTo(midX + shaft, headEnd);
-      path.lineTo(midX + shaft, start);
-    }
-    path.close();
-    return path;
+class AnimatedArrowWidgetState extends State<AnimatedArrowWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  Animation<Offset> _slideAnim = const AlwaysStoppedAnimation(Offset.zero);
+  Animation<double> _fadeAnim = const AlwaysStoppedAnimation(1.0);
+  Animation<double> _shakeAnim = const AlwaysStoppedAnimation(0.0);
+
+  bool _sliding = false;
+  bool _shaking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this);
   }
 
   @override
-  bool shouldRepaint(covariant ArrowPainter old) =>
-      old.color != color || old.dir != dir || old.length != length;
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void triggerSlide(ArrowDir dir, VoidCallback onDone) {
+    if (_sliding) return;
+    _sliding = true;
+    _shaking = false;
+    _ctrl.duration = const Duration(milliseconds: 300);
+
+    final Offset slideEnd = switch (dir) {
+      ArrowDir.right => const Offset(4.0, 0),
+      ArrowDir.left  => const Offset(-4.0, 0),
+      ArrowDir.down  => const Offset(0, 4.0),
+      ArrowDir.up    => const Offset(0, -4.0),
+    };
+
+    _slideAnim = Tween<Offset>(begin: Offset.zero, end: slideEnd).animate(
+        CurvedAnimation(parent: _ctrl, curve: Curves.easeIn));
+
+    _fadeAnim = Tween<double>(begin: 1.0, end: 0.0).animate(
+        CurvedAnimation(
+            parent: _ctrl,
+            curve: const Interval(0.3, 1.0, curve: Curves.easeIn)));
+
+    _shakeAnim = const AlwaysStoppedAnimation(0.0);
+    setState(() {});
+    _ctrl.forward(from: 0).then((_) => onDone());
+  }
+
+  void triggerShake() {
+    if (_sliding || _shaking) return;
+    _shaking = true;
+    _ctrl.duration = const Duration(milliseconds: 400);
+    _slideAnim = const AlwaysStoppedAnimation(Offset.zero);
+    _fadeAnim = const AlwaysStoppedAnimation(1.0);
+
+    _shakeAnim = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end:  8.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 8.0, end: -8.0), weight: 2),
+      TweenSequenceItem(tween: Tween(begin:-8.0, end:  8.0), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: 8.0, end: -4.0), weight: 2),
+      TweenSequenceItem(tween: Tween(begin:-4.0, end:  0.0), weight: 1),
+    ]).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+
+    setState(() {});
+    _ctrl.forward(from: 0).then((_) {
+      if (mounted) setState(() => _shaking = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, child) {
+        Widget w = child!;
+        if (_shaking) {
+          w = Transform.translate(
+              offset: Offset(_shakeAnim.value, 0), child: w);
+        }
+        if (_sliding) {
+          w = FractionalTranslation(
+            translation: _slideAnim.value,
+            child: Opacity(
+                opacity: _fadeAnim.value.clamp(0.0, 1.0), child: w),
+          );
+        }
+        return GestureDetector(onTap: widget.onTap, child: w);
+      },
+      child: ArrowWidget(
+        dir: widget.arrow.dir,
+        length: widget.arrow.length,
+        color: widget.arrow.color,
+        cellSize: widget.cellSize,
+      ),
+    );
+  }
+}
+
+// ── Level State Mixin ─────────────────────────────────────────────────────────
+mixin LevelStateMixin<T extends StatefulWidget> on State<T> {
+  late List<ArrowData> arrows;
+  int lives = 3;
+  int secondsLeft = 60;
+  bool gameOver = false;
+  bool victory = false;
+  bool _levelEnded = false;
+  Timer? _levelTimer;
+
+  final Map<int, GlobalKey<AnimatedArrowWidgetState>> _arrowKeys = {};
+  final AudioService _audio = AudioService();
+
+  int get levelNumber;
+  int get rows;
+  int get cols;
+  List<ArrowData> Function() get buildArrowsFn;
+  Widget Function() get nextLevelBuilder;
+
+  void initLevelState() {
+    arrows = buildArrowsFn();
+    _rebuildKeys();
+    _audio.playGameMusic();
+    _startTimer();
+  }
+
+  void _rebuildKeys() {
+    _arrowKeys.clear();
+    for (final a in arrows) {
+      _arrowKeys[a.id] = GlobalKey<AnimatedArrowWidgetState>();
+    }
+  }
+
+  @override
+  void dispose() {
+    _levelTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _levelEnded = false;
+    _levelTimer?.cancel();
+    _levelTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _levelEnded) return;
+      setState(() {
+        secondsLeft--;
+        if (secondsLeft <= 0) {
+          secondsLeft = 0;
+          _doGameOver();
+        }
+      });
+    });
+  }
+
+  void _doGameOver() {
+    if (_levelEnded) return;
+    _levelEnded = true;
+    _levelTimer?.cancel();
+    _audio.playLoseSound();        // sound ONLY on actual game over
+    setState(() => gameOver = true);
+  }
+
+  void triggerGameOver() => _doGameOver();
+
+  void triggerVictory() {
+    if (_levelEnded) return;
+    _levelEnded = true;
+    _levelTimer?.cancel();
+    _audio.playWinSound();         // sound ONLY on actual victory
+    setState(() => victory = true);
+    if (mounted) {
+      context.read<GameProvider>().recordLevelComplete(
+            level: levelNumber,
+            time: 60 - secondsLeft,
+            lives: lives,
+          );
+    }
+  }
+
+  // ── canSlide ────────────────────────────────────────────────────────────────
+  // An arrow can slide out if every cell from its leading edge to the grid
+  // boundary (in its direction of travel) is unoccupied by other unsolved arrows.
+  bool canSlide(ArrowData arrow) {
+    // Build set of all cells occupied by OTHER unsolved arrows.
+    final occupied = <(int, int)>{};
+    for (final a in arrows) {
+      if (a.id != arrow.id && !a.solved) {
+        occupied.addAll(a.cells);
+      }
+    }
+
+    // Direction deltas.
+    final int dr = switch (arrow.dir) {
+      ArrowDir.down  =>  1,
+      ArrowDir.up    => -1,
+      _              =>  0,
+    };
+    final int dc = switch (arrow.dir) {
+      ArrowDir.right =>  1,
+      ArrowDir.left  => -1,
+      _              =>  0,
+    };
+
+    // Start from the leading edge (first cell beyond the arrow's body).
+    var (int r, int c) = arrow.leadingEdge;
+
+    // Walk toward the grid boundary — any blocked cell means can't slide.
+    while (r >= 0 && r < rows && c >= 0 && c < cols) {
+      if (occupied.contains((r, c))) return false;
+      r += dr;
+      c += dc;
+    }
+    return true;
+  }
+
+  // ── onTap ───────────────────────────────────────────────────────────────────
+  void onTap(ArrowData arrow) {
+    if (gameOver || victory || arrow.solved) return;
+
+    if (!canSlide(arrow)) {
+      // Wrong tap: shake the arrow and deduct a life (no sound here).
+      _arrowKeys[arrow.id]?.currentState?.triggerShake();
+      setState(() {
+        lives--;
+        if (lives <= 0) {
+          lives = 0;
+          // Short delay so shake animation is visible before game over screen.
+          Future.delayed(const Duration(milliseconds: 420), _doGameOver);
+        }
+      });
+      return;
+    }
+
+    // Correct tap: play sound then slide the arrow out.
+    _audio.playArrowSound();
+    _arrowKeys[arrow.id]?.currentState?.triggerSlide(arrow.dir, () {
+      if (!mounted) return;
+      setState(() {
+        arrow.solved = true;
+        if (arrows.every((a) => a.solved)) triggerVictory();
+      });
+    });
+  }
+
+  // ── restart / quit / next ───────────────────────────────────────────────────
+  void restart() {
+    _levelTimer?.cancel();
+    _levelEnded = false;
+    setState(() {
+      arrows = buildArrowsFn();
+      _rebuildKeys();
+      lives = 3;
+      secondsLeft = 60;
+      gameOver = false;
+      victory = false;
+    });
+    _audio.playGameMusic();
+    _startTimer();
+  }
+
+  void quit() {
+    _levelEnded = true;
+    _levelTimer?.cancel();
+    _audio.resumeMenuMusic();
+    Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+
+  void goNextLevel() {
+    _levelEnded = true;
+    _levelTimer?.cancel();
+    Navigator.pushReplacement(
+        context, MaterialPageRoute(builder: (_) => nextLevelBuilder()));
+  }
+
+  // ── HUD ─────────────────────────────────────────────────────────────────────
+  Widget buildHUD() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Lives — tries heart asset images first, falls back to icons.
+          Row(
+            children: List.generate(3, (i) {
+              final active = i < lives;
+              return Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Image.asset(
+                  active ? AppConstants.heartRed : AppConstants.heartBlack,
+                  width: 28,
+                  height: 28,
+                  errorBuilder: (_, __, ___) => Icon(
+                    active ? Icons.favorite : Icons.favorite_border,
+                    color: active ? Colors.redAccent : Colors.grey,
+                    size: 26,
+                  ),
+                ),
+              );
+            }),
+          ),
+          // Timer.
+          Row(children: [
+            Icon(
+              Icons.timer_rounded,
+              color: secondsLeft <= 10 ? Colors.redAccent : AppColors.cyan,
+              size: 20,
+            ),
+            const SizedBox(width: 4),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: TextStyle(
+                color: secondsLeft <= 10 ? Colors.redAccent : Colors.white,
+                fontSize: secondsLeft <= 10 ? 26 : 22,
+                fontWeight: FontWeight.bold,
+              ),
+              child: Text('${secondsLeft}s'),
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  // ── Grid ─────────────────────────────────────────────────────────────────────
+  Widget buildGrid(double cellSize, Set<(int, int)> shapeCells) {
+    return Center(
+      child: SizedBox(
+        width: cellSize * cols,
+        height: cellSize * rows,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Shape background tiles.
+            for (int r = 0; r < rows; r++)
+              for (int c = 0; c < cols; c++)
+                if (shapeCells.contains((r, c)))
+                  Positioned(
+                    left: c * cellSize,
+                    top: r * cellSize,
+                    width: cellSize,
+                    height: cellSize,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.darkNavy.withAlpha(153),
+                        border: Border.all(color: Colors.white12, width: 0.5),
+                      ),
+                    ),
+                  ),
+            // Arrow widgets.
+            for (final a in arrows)
+              if (!a.solved) _buildArrowPositioned(a, cellSize),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildArrowPositioned(ArrowData arrow, double cellSize) {
+    final isHoriz = arrow.dir == ArrowDir.left || arrow.dir == ArrowDir.right;
+    final double w = isHoriz ? cellSize * arrow.length : cellSize;
+    final double h = isHoriz ? cellSize : cellSize * arrow.length;
+
+    // (row, col) is always the anchor. For left/up arrows the body extends
+    // backwards, so we adjust the Positioned top/left accordingly.
+    double left = arrow.col * cellSize;
+    double top  = arrow.row * cellSize;
+
+    // Left arrows: col is the rightmost cell, body extends left.
+    if (arrow.dir == ArrowDir.left) left -= (arrow.length - 1) * cellSize;
+    // Up arrows: row is the bottommost cell, body extends up.
+    if (arrow.dir == ArrowDir.up)   top  -= (arrow.length - 1) * cellSize;
+
+    return Positioned(
+      left: left,
+      top: top,
+      width: w,
+      height: h,
+      child: AnimatedArrowWidget(
+        key: _arrowKeys[arrow.id],
+        arrow: arrow,
+        cellSize: cellSize,
+        onTap: () => onTap(arrow),
+      ),
+    );
+  }
 }

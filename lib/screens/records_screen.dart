@@ -16,7 +16,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
   @override
   void initState() {
     super.initState();
-    // Refresh stats from Supabase on open
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<GameProvider>().refreshStats();
     });
@@ -24,118 +23,99 @@ class _RecordsScreenState extends State<RecordsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
       body: BackgroundWrapper(
         showBackButton: true,
         child: Consumer<GameProvider>(
           builder: (context, gameProvider, child) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: Column(
-                children: [
-                  // Standard top gap with logo
-                  SizedBox(height: size.height * 0.055),
-                  Image.asset(AppConstants.logoWithBg, width: 160, height: 160),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Records',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Image.asset(AppConstants.logoWithBg, width: 90, height: 90),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Records',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: size.height * 0.03),
-                  _buildStatCard(
-                    context,
-                    'Total Wins',
-                    gameProvider.stats.totalWins.toString(),
-                    Colors.greenAccent,
-                    Icons.emoji_events_rounded,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildStatCard(
-                    context,
-                    'Total Losses',
-                    gameProvider.stats.totalLosses.toString(),
-                    Colors.redAccent,
-                    Icons.close_rounded,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildStatCard(
-                    context,
-                    'Total Matches',
-                    gameProvider.stats.totalMatches.toString(),
-                    Colors.cyanAccent,
-                    Icons.sports_esports_rounded,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildStatCard(
-                    context,
-                    'Total Days',
-                    gameProvider.stats.totalDays.toString(),
-                    Colors.orangeAccent,
-                    Icons.calendar_today_rounded,
-                  ),
-                  const SizedBox(height: 20),
-                  // Win Rate card
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 20),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.primaryGradient,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.cyan.withAlpha(60),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withAlpha(26),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(Icons.bar_chart_rounded,
-                                  color: Colors.white, size: 26),
-                            ),
-                            const SizedBox(width: 14),
-                            const Text(
-                              'Win Rate',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          '${gameProvider.stats.winRate.toStringAsFixed(1)}%',
-                          style: const TextStyle(
-                            color: Colors.greenAccent,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
+                    const SizedBox(height: 16),
+                    _buildStatCard('Total Wins',
+                        gameProvider.stats.totalWins.toString(),
+                        Colors.greenAccent, Icons.emoji_events_rounded),
+                    const SizedBox(height: 10),
+                    _buildStatCard('Total Losses',
+                        gameProvider.stats.totalLosses.toString(),
+                        Colors.redAccent, Icons.close_rounded),
+                    const SizedBox(height: 10),
+                    _buildStatCard('Total Matches',
+                        gameProvider.stats.totalMatches.toString(),
+                        Colors.cyanAccent, Icons.sports_esports_rounded),
+                    const SizedBox(height: 10),
+                    _buildStatCard('Total Days',
+                        gameProvider.stats.totalDays.toString(),
+                        Colors.orangeAccent, Icons.calendar_today_rounded),
+                    const SizedBox(height: 10),
+                    // Win Rate card
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 16),
+                      decoration: BoxDecoration(
+                        gradient: AppColors.primaryGradient,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.cyan.withAlpha(60),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withAlpha(26),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.bar_chart_rounded,
+                                    color: Colors.white, size: 22),
+                              ),
+                              const SizedBox(width: 12),
+                              const Text(
+                                'Win Rate',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            '${gameProvider.stats.winRate.toStringAsFixed(1)}%',
+                            style: const TextStyle(
+                              color: Colors.greenAccent,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  SizedBox(height: size.height * 0.04),
-                ],
+                  ],
+                ),
               ),
             );
           },
@@ -145,44 +125,39 @@ class _RecordsScreenState extends State<RecordsScreen> {
   }
 
   Widget _buildStatCard(
-    BuildContext context,
-    String label,
-    String value,
-    Color color,
-    IconData icon,
-  ) {
+      String label, String value, Color color, IconData icon) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: color.withAlpha(80), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: color.withAlpha(60),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: color.withAlpha(50),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: color.withAlpha(51),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: color, size: 26),
+            child: Icon(icon, color: color, size: 22),
           ),
-          const SizedBox(width: 18),
+          const SizedBox(width: 14),
           Expanded(
             child: Text(
               label,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 17,
+                fontSize: 15,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -191,7 +166,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
             value,
             style: TextStyle(
               color: color,
-              fontSize: 28,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
           ),

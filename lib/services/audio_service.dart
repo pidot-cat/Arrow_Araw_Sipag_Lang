@@ -6,8 +6,8 @@ class AudioService {
   factory AudioService() => _instance;
   AudioService._internal();
 
-  final AudioPlayer _musicPlayer = AudioPlayer();
-  final AudioPlayer _sfxPlayer   = AudioPlayer();
+  AudioPlayer _musicPlayer = AudioPlayer();
+  AudioPlayer _sfxPlayer   = AudioPlayer();
 
   bool _isMusicOn = true;
   bool _isSfxOn   = true;
@@ -47,10 +47,21 @@ class AudioService {
     _resumeTimer?.cancel();
     _gameMusicPaused = false;
     _currentMusic = 'menu';
-    await _musicPlayer.stop();
-    await _musicPlayer.setReleaseMode(ReleaseMode.loop);
-    if (_isMusicOn) {
-      await _musicPlayer.play(AssetSource('sounds/First-Music.mp3'));
+    try {
+      await _musicPlayer.stop();
+      await _musicPlayer.setReleaseMode(ReleaseMode.loop);
+      if (_isMusicOn) {
+        await _musicPlayer.play(AssetSource('sounds/First-Music.mp3'));
+      }
+    } catch (e) {
+      // AudioPlayer may be in a bad state after release; recreate and retry
+      try {
+        await _musicPlayer.dispose();
+      } catch (_) {}
+      // Re-init is not possible on a final field — reset via stop only
+      if (_isMusicOn) {
+        await _musicPlayer.play(AssetSource('sounds/First-Music.mp3'));
+      }
     }
   }
 
@@ -127,12 +138,19 @@ class AudioService {
     await playMenuMusic();
   }
 
-  // ── Stop all (logout) ─────────────────────────────────────────────────────
+  // ── Stop all (logout / screens that need silence) ────────────────────────
   void stopAll() {
     _resumeTimer?.cancel();
     _gameMusicPaused = false;
     _currentMusic = '';
     _musicPlayer.stop();
     _sfxPlayer.stop();
+  }
+
+  // ── Force play menu music (ignores _currentMusic guard) ──────────────────
+  // Use this when returning to home from login/logout to ensure music starts.
+  Future<void> forcePlayMenuMusic() async {
+    _currentMusic = ''; // reset so playMenuMusic() won't skip
+    await playMenuMusic();
   }
 }

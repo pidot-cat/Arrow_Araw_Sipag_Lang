@@ -46,18 +46,36 @@ class GameProvider with ChangeNotifier {
   }
 
   Future<void> _loadStats() async {
+    // Always read local prefs first — these are written synchronously before
+    // any async Supabase call, so they are always up-to-date.
     final prefs = await SharedPreferences.getInstance();
-    _stats = GameStatsModel(
+    final localStats = GameStatsModel(
       totalWins: prefs.getInt(AppConstants.keyTotalWins) ?? 0,
       totalLosses: prefs.getInt(AppConstants.keyTotalLosses) ?? 0,
       totalMatches: prefs.getInt(AppConstants.keyTotalMatches) ?? 0,
       totalDays: prefs.getInt(AppConstants.keyTotalDays) ?? 1,
     );
+    _stats = localStats;
     notifyListeners();
     try {
       final remoteStats = await SupabaseService.fetchGameStats();
       if (remoteStats != null) {
-        _stats = remoteStats;
+        // Merge: take the maximum value for each field to avoid overwriting
+        // local increments that haven't been flushed to Supabase yet.
+        _stats = GameStatsModel(
+          totalWins: remoteStats.totalWins > localStats.totalWins
+              ? remoteStats.totalWins
+              : localStats.totalWins,
+          totalLosses: remoteStats.totalLosses > localStats.totalLosses
+              ? remoteStats.totalLosses
+              : localStats.totalLosses,
+          totalMatches: remoteStats.totalMatches > localStats.totalMatches
+              ? remoteStats.totalMatches
+              : localStats.totalMatches,
+          totalDays: remoteStats.totalDays > localStats.totalDays
+              ? remoteStats.totalDays
+              : localStats.totalDays,
+        );
         await _saveLocalStats();
         notifyListeners();
       }
@@ -208,7 +226,18 @@ class GameProvider with ChangeNotifier {
     }
   }
 
-  Future<void> refreshStats() async => await _loadStats();
+  // refreshStats reads local prefs only — these are always up-to-date because
+  // _saveLocalStats() is called first before any async Supabase write.
+  Future<void> refreshStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    _stats = GameStatsModel(
+      totalWins: prefs.getInt(AppConstants.keyTotalWins) ?? 0,
+      totalLosses: prefs.getInt(AppConstants.keyTotalLosses) ?? 0,
+      totalMatches: prefs.getInt(AppConstants.keyTotalMatches) ?? 0,
+      totalDays: prefs.getInt(AppConstants.keyTotalDays) ?? 1,
+    );
+    notifyListeners();
+  }
 
   void nextLevel() {
     if (_currentLevel < 10) initLevel(_currentLevel + 1);

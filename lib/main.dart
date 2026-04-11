@@ -1,13 +1,3 @@
-// lib/main.dart
-// App entry point.
-//
-// Responsibilities:
-//   • Calls Supabase.initialize() with the project URL and anon key.
-//   • Locks the app to portrait orientation.
-//   • Registers GameProvider and AuthProvider at the MultiProvider root
-//     so any widget in the tree can access them via Provider.of().
-//   • Declares the named route table used by Navigator.pushNamed().
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/splash_screen.dart';

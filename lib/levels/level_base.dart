@@ -1,30 +1,8 @@
 // lib/levels/level_base.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared model, painter, and mixin used by every level screen (Levels 1–10).
-//
-// Key classes:
-//   ArrowData         — legacy straight-arrow model (kept for compatibility).
-//   BentCell          — a single (row, col) waypoint in a bent arrow's path.
-//   BentArrowData     — multi-segment arrow model with an escape direction.
-//   BentLevelStateMixin — game-loop mixin for all levels (timer, lives, solve
-//                         order, tap handling, HUD, grid builder).
-//   BentArrowWidget   — stateless wrapper that delegates to BentArrowPainter.
-//   BentArrowPainter  — CustomPainter that draws the snake-path arrow using
-//                       a polyline shaft + filled arrowhead triangle.
-//   LevelStateMixin   — legacy mixin for straight-arrow levels (unused by L1–10
-//                       but kept so nothing else breaks).
-//   ArrowWidget       — legacy straight-arrow widget.
-//   ArrowPainter      — legacy straight-arrow CustomPainter.
-//
-// Snake-path animation (Phase 2 requirement):
-//   When the player taps a BentArrowData in the correct order:
-//     1. animTrigger[id].value is incremented (ValueNotifier).
-//     2. ValueListenableBuilder rebuilds the Positioned widget.
-//     3. flutter_animate's .slideX() / .slideY() / .fadeOut() are chained on
-//        the child BentArrowWidget, making it slide out along its escape axis
-//        while fading — simulating the snake leaving the grid.
-//     4. After 350 ms the arrow.solved flag is set to true and the widget is
-//        removed from the Stack entirely.
+// Shared model, painter, and helpers used by every level screen.
+// Supports bent (multi-segment polyline) arrows via BentArrowData +
+// BentArrowPainter, in addition to the legacy straight ArrowData.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:async';
@@ -352,8 +330,7 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
       ArrowDir.down => (0.0, 1.5),
       ArrowDir.up => (0.0, -1.5),
     };
-    final isHoriz =
-        arrow.escape == ArrowDir.left || arrow.escape == ArrowDir.right;
+    final isHoriz = arrow.escape == ArrowDir.left || arrow.escape == ArrowDir.right;
 
     return Positioned(
         left: left,
@@ -479,17 +456,20 @@ class BentArrowPainter extends CustomPainter {
     _drawPolyline(canvas, pts, shaftPaint, Offset.zero);
 
     // ── Draw shaft border ────────────────────────────────────────────────────
+    final borderPaint = Paint()
+      ..color = Colors.white30
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = shaft * 2 + 2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
     // draw border behind — already drawn, skip (shadow covers it)
 
     // ── Draw arrowhead ───────────────────────────────────────────────────────
     _drawHead(canvas, pts.last, tip, headLen, headWidth, color);
   }
 
-  void _drawPolyline(
-      Canvas canvas, List<Offset> pts, Paint paint, Offset offset) {
-    if (pts.length < 2) {
-      return;
-    } // nothing to draw for single-point (no tail dot)
+  void _drawPolyline(Canvas canvas, List<Offset> pts, Paint paint, Offset offset) {
+    if (pts.length < 2) return; // nothing to draw for single-point (no tail dot)
     final path = Path()..moveTo(pts[0].dx + offset.dx, pts[0].dy + offset.dy);
     for (int i = 1; i < pts.length; i++) {
       final prev = pts[i - 1];
@@ -507,8 +487,7 @@ class BentArrowPainter extends CustomPainter {
     canvas.drawPath(path, paint);
   }
 
-  void _drawHead(Canvas canvas, Offset base, Offset tip, double len,
-      double width, Color color) {
+  void _drawHead(Canvas canvas, Offset base, Offset tip, double len, double width, Color color) {
     final dir = (tip - base);
     final angle = math.atan2(dir.dy, dir.dx);
     final perp = angle + math.pi / 2;
@@ -626,16 +605,8 @@ mixin LevelStateMixin<T extends StatefulWidget> on State<T> {
         }
       }
     }
-    final dr = arrow.dir == ArrowDir.down
-        ? 1
-        : arrow.dir == ArrowDir.up
-            ? -1
-            : 0;
-    final dc = arrow.dir == ArrowDir.right
-        ? 1
-        : arrow.dir == ArrowDir.left
-            ? -1
-            : 0;
+    final dr = arrow.dir == ArrowDir.down ? 1 : arrow.dir == ArrowDir.up ? -1 : 0;
+    final dc = arrow.dir == ArrowDir.right ? 1 : arrow.dir == ArrowDir.left ? -1 : 0;
     var r = arrow.row + dr * arrow.length;
     var c = arrow.col + dc * arrow.length;
     while (r >= 0 && r < rows && c >= 0 && c < cols) {
@@ -703,8 +674,7 @@ mixin LevelStateMixin<T extends StatefulWidget> on State<T> {
 
   Widget buildHUD() => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child:
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Row(
               children: List.generate(
                   3,

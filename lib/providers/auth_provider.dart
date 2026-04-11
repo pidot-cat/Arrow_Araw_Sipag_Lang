@@ -1,20 +1,3 @@
-// lib/providers/auth_provider.dart
-// ChangeNotifier that owns authentication state for the whole app.
-//
-// Responsibilities:
-//   • _loadAuthState() — runs at startup; reads Supabase session first,
-//     falls back to SharedPreferences when offline.
-//   • signUp() / verifySignupOtp() — two-step email-OTP registration.
-//   • login() — signs in and persists credentials locally.
-//   • logout() — clears Supabase session and local prefs.
-//   • deleteAccount() — re-authenticates, deletes account via Supabase
-//     RPC, and clears local state.  The SupabaseService layer also
-//     wipes the user's game_stats and level_progress rows so a
-//     re-registration starts from zero.
-//
-// isReady flag: set to true once _loadAuthState() completes so the
-// SplashScreen can wait for the auth check before navigating.
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

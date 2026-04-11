@@ -1,23 +1,6 @@
 // lib/levels/game_screen_lvl_2.dart
-// ─────────────────────────────────────────────────────────────────────────────
 // Level 2 — 6×6 Grid — Circle Shape
-// 12 bent arrows, solvable in sequential order (tap 0 → 11).
-//
-// Architecture:
-//   • Uses BentLevelStateMixin from level_base.dart for all game-loop logic
-//     (timer, lives, tap handling, HUD, grid renderer, victory/game-over).
-//   • _shapeCells defines which grid cells form the visual shape background.
-//   • _buildArrows() returns the ordered list of BentArrowData objects.
-//     Arrow id == the solve-order index so tapping them out of order triggers
-//     a wrong-tap (life deduction).
-//   • triggerVictory() (inherited) calls GameProvider.recordLevelComplete()
-//     which in turn calls unlockNextLevel() → Level 3 becomes accessible.
-//
-// Snake-path exit animation:
-//   Each BentArrowData has an [escape] direction.  When tapped correctly,
-//   the arrow widget slides out along that axis via flutter_animate
-//   (.slideX / .slideY / .fadeOut) giving the snake-leaving-grid effect.
-// ─────────────────────────────────────────────────────────────────────────────
+// 12 bent arrows — solvable in order 0→11
 
 import 'package:flutter/material.dart';
 import '../utils/app_colors.dart';

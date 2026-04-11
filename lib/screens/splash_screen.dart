@@ -1,15 +1,14 @@
-// lib/screens/splash_screen.dart
-// First screen shown when the app launches.
+// splash_screen.dart
+// Launch screen. Checks real internet connectivity before navigating.
 //
-// Connectivity gate logic (Phase 1 requirement):
-//   Online  + logged-in  → navigate to /home  (no re-login)
-//   Online  + logged-out → navigate to /login
-//   Offline + logged-in  → navigate to /home  (session cached)
-//   Offline + logged-out → show persistent "no internet" SnackBar
-//                          and poll every 3 s until connection returns.
+// KEY BEHAVIOURS:
+//   • Online + logged-in (session persisted)  → go directly to /home (no login needed)
+//   • Online + not logged-in                  → go to /login
+//   • Offline + previously logged-in          → go directly to /home (session cached)
+//   • Offline + never logged-in               → show persistent snackbar, keep polling
 //
-// The app NEVER forces a re-login when the user already has a cached
-// session, ensuring a smooth offline-first experience.
+// The app NEVER forces a re-login when the user is already logged in,
+// regardless of whether the device is currently online.
 
 import 'dart:async';
 import 'dart:io';

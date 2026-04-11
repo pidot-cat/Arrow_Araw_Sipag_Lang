@@ -14,18 +14,18 @@ A vibrant arrow puzzle escape mobile game built with Flutter.
 
 #### 🎮 Game Levels
 
-| Level | Grid  |  Shape   | Arrows |
-|-------|-------|----------|--------|
-|   1   | 5×5   | Heart    |   13   |
-|   2   | 6×6   | Circle   |   20   |
-|   3   | 7×7   | Triangle |   25   |
-|   4   | 8×8   | Square   |   30   |
-|   5   | 9×9   | Pentagon |   38   |
-|   6   | 10×10 | Hexagon  |   45   |
-|   7   | 11×11 | Heptagon |   55   |
-|   8   | 12×12 | Shield   |   62   |
-|   9   | 13×13 | Nonagon  |   70   |
-|   10  | 14×14 | Cross    |   66   |
+| Level | Grid  | Shape    | Arrows | Bent Style |
+|-------|-------|----------|--------|------------|
+| 1     | 5×5   | Heart    | ~13    | Straight & L-bent |
+| 2     | 6×6   | Circle   | ~20    | Straight & L-bent |
+| 3     | 7×7   | Triangle | ~25    | Straight & L-bent |
+| 4     | 8×8   | Square   | ~30    | Straight & L-bent |
+| 5     | 9×9   | Pentagon | ~38    | Straight & L-bent |
+| 6     | 10×10 | Hexagon  | ~45    | Straight & L-bent |
+| 7     | 11×11 | Heptagon | ~55    | Straight & L-bent |
+| 8     | 12×12 | Shield   | 62     | Straight & L-bent |
+| 9     | 13×13 | Nonagon  | ~70    | Straight & L-bent |
+| 10    | 14×14 | Cross    | 66     | Straight & L-bent |
 
 #### ⚙️ Other Screens
 

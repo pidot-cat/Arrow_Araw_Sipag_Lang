@@ -487,8 +487,9 @@ class BentArrowPainter extends CustomPainter {
 
   void _drawPolyline(
       Canvas canvas, List<Offset> pts, Paint paint, Offset offset) {
-    if (pts.length < 2)
-      return; // nothing to draw for single-point (no tail dot)
+    if (pts.length < 2) {
+      return;
+    } // nothing to draw for single-point (no tail dot)
     final path = Path()..moveTo(pts[0].dx + offset.dx, pts[0].dy + offset.dy);
     for (int i = 1; i < pts.length; i++) {
       final prev = pts[i - 1];

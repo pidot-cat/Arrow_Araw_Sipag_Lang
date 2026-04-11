@@ -1,8 +1,5 @@
 // lib/levels/game_screen_lvl_4.dart
-// ─────────────────────────────────────────────────────────────────────────────
-// Level 4 — 8×8 Grid — SQUARE shape
-// 8 arrows covering the four sides + four corners. No cell overlaps.
-// ─────────────────────────────────────────────────────────────────────────────
+// Level 4 — 8×8 Grid — SQUARE shape — 30 arrows (outline only)
 
 import 'package:flutter/material.dart';
 import '../utils/app_colors.dart';
@@ -13,41 +10,62 @@ import 'game_screen_lvl_5.dart';
 
 const int _rows = 8, _cols = 8;
 
-// Square perimeter — rows 1–6, cols 1–6
+// Square outline — all perimeter cells
 const Set<(int, int)> _shapeCells = {
-  (1,1),(1,2),(1,3),(1,4),(1,5),(1,6),
-  (2,1),(2,6),(3,1),(3,6),(4,1),(4,6),(5,1),(5,6),
-  (6,1),(6,2),(6,3),(6,4),(6,5),(6,6),
+  (0,0),(0,1),(0,2),(0,3),(0,4),(0,5),(0,6),(0,7),
+  (1,0),(1,7),
+  (2,0),(2,7),
+  (3,0),(3,7),
+  (4,0),(4,7),
+  (5,0),(5,7),
+  (6,0),(6,7),
+  (7,0),(7,1),(7,2),(7,3),(7,4),(7,5),(7,6),(7,7),
 };
 
-// Each cell belongs to exactly ONE arrow
 List<BentArrowData> _buildArrows() => [
-  // Arrow 0 — top edge left half, exits up
-  BentArrowData(id:0, segs:[BentCell(1,1),BentCell(1,2),BentCell(1,3)], escape:ArrowDir.up,    color:AppColors.arrowRed),
-  // Arrow 1 — top edge right half, exits up
-  BentArrowData(id:1, segs:[BentCell(1,4),BentCell(1,5),BentCell(1,6)], escape:ArrowDir.up,    color:AppColors.arrowOrange),
-  // Arrow 2 — right side upper, exits right
-  BentArrowData(id:2, segs:[BentCell(2,6),BentCell(3,6)],               escape:ArrowDir.right, color:AppColors.arrowYellow),
-  // Arrow 3 — right side lower, exits right
-  BentArrowData(id:3, segs:[BentCell(4,6),BentCell(5,6)],               escape:ArrowDir.right, color:AppColors.arrowGreen),
-  // Arrow 4 — bottom edge right half, exits down
-  BentArrowData(id:4, segs:[BentCell(6,6),BentCell(6,5),BentCell(6,4)], escape:ArrowDir.down,  color:AppColors.arrowCyan),
-  // Arrow 5 — bottom edge left half, exits down
-  BentArrowData(id:5, segs:[BentCell(6,3),BentCell(6,2),BentCell(6,1)], escape:ArrowDir.down,  color:AppColors.arrowBlue),
-  // Arrow 6 — left side lower, exits left
-  BentArrowData(id:6, segs:[BentCell(5,1),BentCell(4,1)],               escape:ArrowDir.left,  color:AppColors.arrowPurple),
-  // Arrow 7 — left side upper, exits left
-  BentArrowData(id:7, segs:[BentCell(3,1),BentCell(2,1)],               escape:ArrowDir.left,  color:AppColors.arrowPink),
+  // Top row — exits up
+  BentArrowData(id:0,  segs:[BentCell(0,0)], escape:ArrowDir.up,    color:AppColors.arrowRed),
+  BentArrowData(id:1,  segs:[BentCell(0,1)], escape:ArrowDir.up,    color:AppColors.arrowOrange),
+  BentArrowData(id:2,  segs:[BentCell(0,2)], escape:ArrowDir.up,    color:AppColors.arrowYellow),
+  BentArrowData(id:3,  segs:[BentCell(0,3)], escape:ArrowDir.up,    color:AppColors.arrowGreen),
+  BentArrowData(id:4,  segs:[BentCell(0,4)], escape:ArrowDir.up,    color:AppColors.arrowCyan),
+  BentArrowData(id:5,  segs:[BentCell(0,5)], escape:ArrowDir.up,    color:AppColors.arrowBlue),
+  BentArrowData(id:6,  segs:[BentCell(0,6)], escape:ArrowDir.up,    color:AppColors.arrowPurple),
+  BentArrowData(id:7,  segs:[BentCell(0,7)], escape:ArrowDir.up,    color:AppColors.arrowPink),
+  // Right column — exits right
+  BentArrowData(id:8,  segs:[BentCell(1,7)], escape:ArrowDir.right, color:AppColors.arrowRed),
+  BentArrowData(id:9,  segs:[BentCell(2,7)], escape:ArrowDir.right, color:AppColors.arrowOrange),
+  BentArrowData(id:10, segs:[BentCell(3,7)], escape:ArrowDir.right, color:AppColors.arrowYellow),
+  BentArrowData(id:11, segs:[BentCell(4,7)], escape:ArrowDir.right, color:AppColors.arrowGreen),
+  BentArrowData(id:12, segs:[BentCell(5,7)], escape:ArrowDir.right, color:AppColors.arrowCyan),
+  BentArrowData(id:13, segs:[BentCell(6,7)], escape:ArrowDir.right, color:AppColors.arrowBlue),
+  // Bottom row — exits down
+  BentArrowData(id:14, segs:[BentCell(7,7)], escape:ArrowDir.down,  color:AppColors.arrowPurple),
+  BentArrowData(id:15, segs:[BentCell(7,6)], escape:ArrowDir.down,  color:AppColors.arrowPink),
+  BentArrowData(id:16, segs:[BentCell(7,5)], escape:ArrowDir.down,  color:AppColors.arrowRed),
+  BentArrowData(id:17, segs:[BentCell(7,4)], escape:ArrowDir.down,  color:AppColors.arrowOrange),
+  BentArrowData(id:18, segs:[BentCell(7,3)], escape:ArrowDir.down,  color:AppColors.arrowYellow),
+  BentArrowData(id:19, segs:[BentCell(7,2)], escape:ArrowDir.down,  color:AppColors.arrowGreen),
+  BentArrowData(id:20, segs:[BentCell(7,1)], escape:ArrowDir.down,  color:AppColors.arrowCyan),
+  BentArrowData(id:21, segs:[BentCell(7,0)], escape:ArrowDir.down,  color:AppColors.arrowBlue),
+  // Left column — exits left
+  BentArrowData(id:22, segs:[BentCell(6,0)], escape:ArrowDir.left,  color:AppColors.arrowPurple),
+  BentArrowData(id:23, segs:[BentCell(5,0)], escape:ArrowDir.left,  color:AppColors.arrowPink),
+  BentArrowData(id:24, segs:[BentCell(4,0)], escape:ArrowDir.left,  color:AppColors.arrowRed),
+  BentArrowData(id:25, segs:[BentCell(3,0)], escape:ArrowDir.left,  color:AppColors.arrowOrange),
+  BentArrowData(id:26, segs:[BentCell(2,0)], escape:ArrowDir.left,  color:AppColors.arrowYellow),
+  BentArrowData(id:27, segs:[BentCell(1,0)], escape:ArrowDir.left,  color:AppColors.arrowGreen),
+  // 2 inner L-bends to reach 30 total
+  BentArrowData(id:28, segs:[BentCell(2,1),BentCell(2,2)], escape:ArrowDir.up,   color:AppColors.arrowCyan),
+  BentArrowData(id:29, segs:[BentCell(5,5),BentCell(5,6)], escape:ArrowDir.down, color:AppColors.arrowBlue),
 ];
 
 class GameScreenLvl4 extends StatefulWidget {
   const GameScreenLvl4({super.key});
-  @override
-  State<GameScreenLvl4> createState() => _GameScreenLvl4State();
+  @override State<GameScreenLvl4> createState() => _State();
 }
 
-class _GameScreenLvl4State extends State<GameScreenLvl4>
-    with BentLevelStateMixin<GameScreenLvl4> {
+class _State extends State<GameScreenLvl4> with BentLevelStateMixin<GameScreenLvl4> {
   @override int get levelNumber => 4;
   @override int get rows => _rows;
   @override int get cols => _cols;
@@ -65,10 +83,10 @@ class _GameScreenLvl4State extends State<GameScreenLvl4>
       body: Stack(children: [
         SafeArea(child: Column(children: [
           buildHUD(),
-          const SizedBox(height: 6),
-          Text('Level 4 · Square · 8×8',
-              style: TextStyle(color: Colors.white.withValues(alpha:0.5), fontSize:13, letterSpacing:1.2)),
-          const SizedBox(height: 10),
+          const SizedBox(height: 4),
+          Text('Square · 8×8 · 30 Arrows',
+              style: TextStyle(color: Colors.white.withValues(alpha:0.45), fontSize:12, letterSpacing:1.1)),
+          const SizedBox(height: 8),
           Expanded(child: Center(child: buildGrid(cellSize, _shapeCells))),
         ])),
         if (gameOver) GameOverOverlay(onRetry: restart, onBack: quit),

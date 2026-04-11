@@ -142,8 +142,11 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
 
   void triggerGameOver() {
     _levelTimer?.cancel();
-    _audio.playLoseSound();
+    _audio.playGameOverSound();
     setState(() => gameOver = true);
+    if (mounted) {
+      context.read<GameProvider>().recordLevelLoss();
+    }
   }
 
   void triggerVictory() {
@@ -151,15 +154,18 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     _audio.playWinSound();
     setState(() => victory = true);
     if (mounted) {
-      // Record win stats via GameProvider (syncs to Supabase game_stats table)
       context.read<GameProvider>().recordLevelComplete(
             level: levelNumber,
             time: 60 - secondsLeft,
             lives: lives,
           );
     }
-    // Unlock the next level persistently so LevelSelectScreen sees it on pop
-    LevelUnlockService.instance.unlockLevel(levelNumber + 1);
+    // If last level (10) cleared — unlock ALL levels permanently (master unlock)
+    if (levelNumber >= 10) {
+      LevelUnlockService.instance.unlockAll();
+    } else {
+      LevelUnlockService.instance.unlockLevel(levelNumber + 1);
+    }
   }
 
   /// Checks whether arrow can slide out in its escape direction without
@@ -209,7 +215,8 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
   }
 
   void wrongTap() {
-    _audio.playLoseSound();
+    // Wrong-move sound on every bad tap; game-over sound only on zero lives
+    _audio.playWrongSound();
     setState(() {
       lives--;
       if (lives <= 0) triggerGameOver();
@@ -246,34 +253,82 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
   }
 
   // ── HUD ─────────────────────────────────────────────────────────────────────
+  // Layout: [Back] [Level N] [♥♥♥] [Timer + progress bar]
 
-  Widget buildHUD() => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child:
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Row(
-              children: List.generate(
+  Widget buildHUD() {
+    final progress = secondsLeft / 60.0;
+    final timerColor = secondsLeft <= 10 ? Colors.redAccent : Colors.cyanAccent;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            children: [
+              // Back button
+              IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70, size: 20),
+                onPressed: quit,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 6),
+              // Level label
+              Text(
+                'Level $levelNumber',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  letterSpacing: 1.1,
+                ),
+              ),
+              const Spacer(),
+              // Hearts
+              Row(
+                children: List.generate(
                   3,
-                  (i) => Icon(
+                  (i) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Icon(
                       i < lives ? Icons.favorite : Icons.favorite_border,
                       color: i < lives ? Colors.redAccent : Colors.grey,
-                      size: 26))),
-          Row(children: [
-            Icon(Icons.timer,
-                color: secondsLeft <= 10 ? Colors.redAccent : Colors.cyan,
-                size: 20),
-            const SizedBox(width: 4),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
-              style: TextStyle(
-                  color: secondsLeft <= 10 ? Colors.redAccent : Colors.white,
-                  fontSize: secondsLeft <= 10 ? 26 : 22,
-                  fontWeight: FontWeight.bold),
-              child: Text('${secondsLeft}s'),
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Timer digit
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  color: timerColor,
+                  fontSize: secondsLeft <= 10 ? 22 : 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                child: Text('${secondsLeft}s'),
+              ),
+            ],
+          ),
+        ),
+        // Linear depleting progress bar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress.clamp(0.0, 1.0),
+              minHeight: 5,
+              backgroundColor: Colors.white12,
+              valueColor: AlwaysStoppedAnimation<Color>(timerColor),
             ),
-          ]),
-        ]),
-      );
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
 
   // ── Grid + Arrows ────────────────────────────────────────────────────────────
 
@@ -579,7 +634,7 @@ mixin LevelStateMixin<T extends StatefulWidget> on State<T> {
 
   void triggerGameOver() {
     _levelTimer?.cancel();
-    _audio.playLoseSound();
+    _audio.playGameOverSound();
     setState(() => gameOver = true);
   }
 
@@ -588,15 +643,17 @@ mixin LevelStateMixin<T extends StatefulWidget> on State<T> {
     _audio.playWinSound();
     setState(() => victory = true);
     if (mounted) {
-      // Record win stats via GameProvider (syncs to Supabase game_stats table)
       context.read<GameProvider>().recordLevelComplete(
             level: levelNumber,
             time: 60 - secondsLeft,
             lives: lives,
           );
     }
-    // Unlock the next level persistently so LevelSelectScreen sees it on pop
-    LevelUnlockService.instance.unlockLevel(levelNumber + 1);
+    if (levelNumber >= 10) {
+      LevelUnlockService.instance.unlockAll();
+    } else {
+      LevelUnlockService.instance.unlockLevel(levelNumber + 1);
+    }
   }
 
   bool canSlide(ArrowData arrow) {
@@ -639,7 +696,7 @@ mixin LevelStateMixin<T extends StatefulWidget> on State<T> {
   }
 
   void wrongTap() {
-    _audio.playLoseSound();
+    _audio.playWrongSound();
     setState(() {
       lives--;
       if (lives <= 0) triggerGameOver();
@@ -675,32 +732,54 @@ mixin LevelStateMixin<T extends StatefulWidget> on State<T> {
         context, MaterialPageRoute(builder: (_) => nextLevelBuilder()));
   }
 
-  Widget buildHUD() => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Row(
-              children: List.generate(
-                  3,
-                  (i) => Icon(
-                      i < lives ? Icons.favorite : Icons.favorite_border,
-                      color: i < lives ? Colors.redAccent : Colors.grey,
-                      size: 26))),
-          Row(children: [
-            Icon(Icons.timer,
-                color: secondsLeft <= 10 ? Colors.redAccent : Colors.cyan,
-                size: 20),
-            const SizedBox(width: 4),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
-              style: TextStyle(
-                  color: secondsLeft <= 10 ? Colors.redAccent : Colors.white,
-                  fontSize: secondsLeft <= 10 ? 26 : 22,
-                  fontWeight: FontWeight.bold),
-              child: Text('${secondsLeft}s'),
+  Widget buildHUD() {
+    final progress = secondsLeft / 60.0;
+    final timerColor = secondsLeft <= 10 ? Colors.redAccent : Colors.cyanAccent;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70, size: 20),
+                onPressed: quit,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 6),
+              Text('Level $levelNumber',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1.1)),
+              const Spacer(),
+              Row(children: List.generate(3, (i) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Icon(i < lives ? Icons.favorite : Icons.favorite_border,
+                  color: i < lives ? Colors.redAccent : Colors.grey, size: 22)))),
+              const SizedBox(width: 10),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(color: timerColor, fontSize: secondsLeft <= 10 ? 22 : 18, fontWeight: FontWeight.bold),
+                child: Text('${secondsLeft}s')),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress.clamp(0.0, 1.0),
+              minHeight: 5,
+              backgroundColor: Colors.white12,
+              valueColor: AlwaysStoppedAnimation<Color>(timerColor),
             ),
-          ]),
-        ]),
-      );
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
 
   Widget buildGrid(double cellSize, Set<(int, int)> shapeCells) {
     // Only show cell backgrounds on cells with an unsolved arrow

@@ -242,7 +242,13 @@ class GameProvider with ChangeNotifier {
       {required int level, required int time, required int lives}) {
     _stats.addWin();
     _saveStats();
-    _audioService.playWinSound();
+    notifyListeners();
+  }
+
+  /// Called from BentLevelStateMixin.triggerGameOver to record a loss.
+  void recordLevelLoss() {
+    _stats.addLoss();
+    _saveStats();
     notifyListeners();
   }
 

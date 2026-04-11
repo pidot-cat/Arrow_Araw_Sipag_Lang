@@ -1,31 +1,147 @@
-// settings_screen.dart
-// Settings screen: logout, delete account (with password show/hide),
-// and navigation to support pages. Delete account also resets game stats.
+// lib/screens/settings_screen.dart
+// Settings screen: Music/SFX toggles, logout, delete account, support links.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/background_wrapper.dart';
 import '../utils/constants.dart';
+import '../utils/app_colors.dart';
 import '../providers/auth_provider.dart';
 import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
+import '../services/level_unlock_service.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
 
-  /// Stops music, signs out, navigates to login.
-  Future<void> _handleLogout(BuildContext context) async {
-    AudioService().stopAll();
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    await authProvider.logout();
-    if (context.mounted) {
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+class _SettingsScreenState extends State<SettingsScreen> {
+  final AudioService _audio = AudioService();
+
+  Future<void> _handleLogout() async {
+    _audio.stopAll();
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    await auth.logout();
+    if (mounted) {
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
     }
   }
 
-  /// Delete Account dialog with password visibility toggle.
-  /// On success: clears auth AND resets game stats so records start fresh.
-  Future<void> _showDeleteAccountDialog(BuildContext context) async {
+  void _showAudioSettingsModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E2E),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Audio Settings',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.1)),
+              const SizedBox(height: 6),
+              Text('assets/sounds/  ·  lib/sounds/',
+                  style: TextStyle(
+                      color: Colors.white.withAlpha(100), fontSize: 11)),
+              const SizedBox(height: 20),
+              // Music toggle
+              _buildAudioToggle(
+                ctx,
+                setModal,
+                icon: Icons.music_note_rounded,
+                label: 'Background Music',
+                subtitle: 'Lobby-Music · Ingame-Music',
+                value: _audio.isMusicOn,
+                onChanged: (v) async {
+                  await _audio.toggleMusic();
+                  setModal(() {});
+                  setState(() {});
+                },
+              ),
+              const SizedBox(height: 12),
+              // SFX toggle
+              _buildAudioToggle(
+                ctx,
+                setModal,
+                icon: Icons.volume_up_rounded,
+                label: 'Sound FX',
+                subtitle: 'Arrow · Win · Wrong Move · Game Over',
+                value: _audio.isSfxOn,
+                onChanged: (v) {
+                  _audio.toggleSfx();
+                  setModal(() {});
+                  setState(() {});
+                },
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAudioToggle(
+    BuildContext ctx,
+    StateSetter setModal, {
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required bool value,
+    required Function(bool) onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(13),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withAlpha(26)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: Colors.cyan.withAlpha(51),
+                borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, color: Colors.cyan, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold)),
+                Text(subtitle,
+                    style: TextStyle(
+                        color: Colors.white.withAlpha(120), fontSize: 11)),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: Colors.cyanAccent,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showDeleteAccountDialog() async {
     final TextEditingController passCtrl = TextEditingController();
 
     await showDialog(
@@ -33,7 +149,7 @@ class SettingsScreen extends StatelessWidget {
       barrierDismissible: false,
       builder: (ctx) {
         bool isLoading = false;
-        bool obscureText = true; // Password visibility toggle state
+        bool obscureText = true;
         String? errorMsg;
 
         return StatefulBuilder(
@@ -52,12 +168,15 @@ class SettingsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'This action is permanent and cannot be undone.\nEnter your password to confirm.',
+                    'This is permanent and cannot be undone.\nEnter your password to confirm.',
                     style: TextStyle(color: Colors.white70, fontSize: 13),
                   ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Re-registering with the same email will start fresh (Level 1, zero stats).',
+                    style: TextStyle(color: Colors.orange.withAlpha(200), fontSize: 12),
+                  ),
                   const SizedBox(height: 16),
-
-                  // Password field with show/hide toggle
                   TextField(
                     controller: passCtrl,
                     obscureText: obscureText,
@@ -66,7 +185,6 @@ class SettingsScreen extends StatelessWidget {
                       hintText: 'Enter your password',
                       hintStyle: const TextStyle(color: Colors.white38),
                       prefixIcon: const Icon(Icons.lock, color: Colors.white38),
-                      // Eye icon to toggle password visibility
                       suffixIcon: IconButton(
                         icon: Icon(
                           obscureText ? Icons.visibility_off : Icons.visibility,
@@ -88,14 +206,11 @@ class SettingsScreen extends StatelessWidget {
                 ],
               ),
               actions: [
-                // Cancel
                 TextButton(
                   onPressed: isLoading ? null : () => Navigator.pop(ctx),
                   child: const Text('Cancel',
                       style: TextStyle(color: Colors.white54)),
                 ),
-
-                // Confirm Delete
                 ElevatedButton(
                   onPressed: isLoading
                       ? null
@@ -116,23 +231,21 @@ class SettingsScreen extends StatelessWidget {
                           final gameProvider =
                               Provider.of<GameProvider>(ctx, listen: false);
 
-                          // Capture navigators BEFORE any await to avoid
-                          // use_build_context_synchronously lint errors.
                           final dialogNav = Navigator.of(ctx);
                           final rootNav = Navigator.of(context);
 
-                          // 1. Wipe remote + local stats FIRST while session is still valid
+                          // Wipe stats and level progress BEFORE deletion
                           await gameProvider.resetStats();
+                          await LevelUnlockService.instance.resetProgress();
 
-                          // 2. Proceed with account deletion (also deletes DB rows)
+                          // Hard-delete account from Supabase Auth + public tables
                           final result = await authProvider.deleteAccount(pass);
                           if (!ctx.mounted) return;
 
                           if (result == null) {
-                            // Account deleted — wipe local game stats so records reset
-                            await gameProvider.resetStats();
+                            // Success — navigate to login as fresh user
                             dialogNav.pop();
-                            AudioService().stopAll();
+                            _audio.stopAll();
                             rootNav.pushNamedAndRemoveUntil(
                                 '/login', (r) => false);
                           } else {
@@ -163,7 +276,6 @@ class SettingsScreen extends StatelessWidget {
         );
       },
     );
-
     passCtrl.dispose();
   }
 
@@ -181,66 +293,57 @@ class SettingsScreen extends StatelessWidget {
             child: Column(
               children: [
                 SizedBox(height: size.height * 0.01),
-
-                // Compact logo — intentionally small so all tiles fit without scroll
-                Center(
-                    child: Image.asset(AppConstants.logoWithBg,
-                        width: 100, height: 100)),
+                Center(child: Image.asset(AppConstants.logoWithBg, width: 100, height: 100)),
                 const SizedBox(height: 8),
-
-                const Text(
-                  'Settings',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2),
-                  textAlign: TextAlign.center,
-                ),
+                const Text('Settings',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2),
+                    textAlign: TextAlign.center),
                 const SizedBox(height: 4),
-
-                // Logged-in username label
                 Text('Logged in as: ${authProvider.username}',
                     style: TextStyle(
                         color: Colors.white.withAlpha(179), fontSize: 13)),
                 const SizedBox(height: 16),
 
-                // Navigation tiles
+                // ── Audio Settings ──────────────────────────────────────────
                 _buildSettingTile(
-                    context,
-                    'Contact Us',
-                    'Get help and support',
+                  'Audio Settings',
+                  _audio.isMusicOn && _audio.isSfxOn
+                      ? 'Music & SFX On'
+                      : !_audio.isMusicOn && !_audio.isSfxOn
+                          ? 'Music & SFX Off'
+                          : 'Partially Muted',
+                  Icons.tune_rounded,
+                  _showAudioSettingsModal,
+                ),
+                const SizedBox(height: 10),
+
+                // ── Navigation tiles ────────────────────────────────────────
+                _buildSettingTile('Contact Us', 'Get help and support',
                     Icons.contact_support,
                     () => Navigator.pushNamed(context, '/contact')),
                 const SizedBox(height: 10),
-                _buildSettingTile(
-                    context,
-                    'Terms of Service',
-                    'Read our terms',
+                _buildSettingTile('Terms of Service', 'Read our terms',
                     Icons.description,
                     () => Navigator.pushNamed(context, '/terms')),
                 const SizedBox(height: 10),
-                _buildSettingTile(
-                    context,
-                    'Privacy Policy',
-                    'Your privacy matters',
+                _buildSettingTile('Privacy Policy', 'Your privacy matters',
                     Icons.privacy_tip,
                     () => Navigator.pushNamed(context, '/policy')),
                 const SizedBox(height: 10),
-                _buildSettingTile(
-                    context,
-                    'About Us',
-                    'Learn more about the app',
+                _buildSettingTile('About Us', 'Learn more about the app',
                     Icons.info,
                     () => Navigator.pushNamed(context, '/about')),
 
                 const Spacer(),
 
-                // Log Out
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () => _handleLogout(context),
+                    onPressed: _handleLogout,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF8B0000),
                       foregroundColor: Colors.white,
@@ -248,7 +351,6 @@ class SettingsScreen extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
                       elevation: 4,
-                      shadowColor: const Color(0xFF8B0000).withAlpha(120),
                     ),
                     child: const Text('LOG OUT',
                         style: TextStyle(
@@ -258,16 +360,13 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-
-                // Delete Account
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () => _showDeleteAccountDialog(context),
+                    onPressed: _showDeleteAccountDialog,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.redAccent,
-                      side:
-                          const BorderSide(color: Colors.redAccent, width: 1.5),
+                      side: const BorderSide(color: Colors.redAccent, width: 1.5),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
@@ -288,9 +387,8 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  /// Tappable settings row: icon + title + subtitle + chevron.
-  Widget _buildSettingTile(BuildContext context, String title, String subtitle,
-      IconData icon, VoidCallback onTap) {
+  Widget _buildSettingTile(
+      String title, String subtitle, IconData icon, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),

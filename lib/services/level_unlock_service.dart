@@ -97,6 +97,29 @@ class LevelUnlockService {
     }
   }
 
+  // ── Master unlock — called when all 10 levels are cleared ────────────────
+
+  /// Unlocks all 10 levels permanently so the user can replay freely.
+  Future<void> unlockAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_kHighestLevel, 10);
+    try {
+      final user = _client.auth.currentUser;
+      if (user != null) {
+        await _client.from(_kTable).upsert(
+          {
+            'user_id': user.id,
+            'highest_unlocked_level': 10,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          onConflict: 'user_id',
+        );
+      }
+    } catch (e) {
+      debugPrint('[LevelUnlockService] unlockAll remote error: $e');
+    }
+  }
+
   // ── Reset (used when account is deleted) ──────────────────────────────────
 
   /// Resets progress to Level 1 locally. Remote cleanup is handled by

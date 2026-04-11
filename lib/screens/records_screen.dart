@@ -1,7 +1,5 @@
-// records_screen.dart
-// Shows player game statistics pulled from Supabase (with local SharedPrefs cache).
-// Fixed layout: no scroll, all content fits on one screen, logo enlarged to 200px,
-// faint duplicate logo at bottom removed.
+// lib/screens/records_screen.dart
+// Compact records screen — max-height 60dp stat rows, accurate stats display.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -12,7 +10,6 @@ import '../utils/constants.dart';
 
 class RecordsScreen extends StatefulWidget {
   const RecordsScreen({super.key});
-
   @override
   State<RecordsScreen> createState() => _RecordsScreenState();
 }
@@ -21,7 +18,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
   @override
   void initState() {
     super.initState();
-    // Pull fresh stats from Supabase after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<GameProvider>().refreshStats();
     });
@@ -35,87 +31,82 @@ class _RecordsScreenState extends State<RecordsScreen> {
       body: BackgroundWrapper(
         showBackButton: true,
         child: Consumer<GameProvider>(
-          builder: (context, gameProvider, child) {
-            // Fixed layout — no scrolling
+          builder: (context, gp, _) {
+            final stats = gp.stats;
+            final winRate = stats.totalMatches > 0
+                ? (stats.totalWins / stats.totalMatches * 100)
+                : 0.0;
+
             return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Column(
                 children: [
-                  SizedBox(height: size.height * 0.04),
-
-                  // Logo — enlarged to 200px to match other screens
-                  Image.asset(AppConstants.logoWithBg, width: 200, height: 200),
-                  const SizedBox(height: 12),
-
-                  // Screen title
+                  SizedBox(height: size.height * 0.03),
+                  Image.asset(AppConstants.logoWithBg, width: 140, height: 140),
+                  const SizedBox(height: 10),
                   const Text(
                     'Records',
                     style: TextStyle(
-                      color: Colors.white, fontSize: 26,
-                      fontWeight: FontWeight.bold, letterSpacing: 1.2,
-                    ),
-                    textAlign: TextAlign.center,
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2),
                   ),
-                  SizedBox(height: size.height * 0.025),
+                  SizedBox(height: size.height * 0.02),
 
-                  // Individual stat cards
-                  _buildStatCard(context, 'Total Wins',
-                      gameProvider.stats.totalWins.toString(),
-                      Colors.greenAccent, Icons.emoji_events_rounded),
+                  // ── Compact stat rows (max-height 60dp) ──────────────────
+                  _compactStat('Wins',    '${stats.totalWins}',    Colors.greenAccent,  Icons.emoji_events_rounded),
+                  const SizedBox(height: 8),
+                  _compactStat('Losses',  '${stats.totalLosses}',  Colors.redAccent,    Icons.close_rounded),
+                  const SizedBox(height: 8),
+                  _compactStat('Matches', '${stats.totalMatches}', Colors.cyanAccent,   Icons.sports_esports_rounded),
+                  const SizedBox(height: 8),
+                  _compactStat('Days Active', '${stats.totalDays}', Colors.orangeAccent, Icons.calendar_today_rounded),
                   const SizedBox(height: 12),
-                  _buildStatCard(context, 'Total Losses',
-                      gameProvider.stats.totalLosses.toString(),
-                      Colors.redAccent, Icons.close_rounded),
-                  const SizedBox(height: 12),
-                  _buildStatCard(context, 'Total Matches',
-                      gameProvider.stats.totalMatches.toString(),
-                      Colors.cyanAccent, Icons.sports_esports_rounded),
-                  const SizedBox(height: 12),
-                  _buildStatCard(context, 'Total Days',
-                      gameProvider.stats.totalDays.toString(),
-                      Colors.orangeAccent, Icons.calendar_today_rounded),
-                  const SizedBox(height: 16),
 
-                  // Win rate gradient card
+                  // ── Win Rate gradient card ────────────────────────────────
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                    constraints: const BoxConstraints(maxHeight: 60),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                     decoration: BoxDecoration(
                       gradient: AppColors.primaryGradient,
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(14),
                       boxShadow: [
-                        BoxShadow(color: Colors.cyan.withAlpha(60),
-                            blurRadius: 12, offset: const Offset(0, 4)),
+                        BoxShadow(
+                            color: Colors.cyan.withAlpha(60),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3)),
                       ],
                     ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
                               color: Colors.white.withAlpha(26),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.bar_chart_rounded,
-                                color: Colors.white, size: 26),
-                          ),
-                          const SizedBox(width: 14),
-                          const Text('Win Rate',
-                              style: TextStyle(color: Colors.white,
-                                  fontSize: 18, fontWeight: FontWeight.bold)),
-                        ]),
-                        // Win rate percentage value
+                              borderRadius: BorderRadius.circular(8)),
+                          child: const Icon(Icons.bar_chart_rounded,
+                              color: Colors.white, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text('Win Rate',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold)),
+                        ),
                         Text(
-                          '${gameProvider.stats.winRate.toStringAsFixed(1)}%',
-                          style: const TextStyle(color: Colors.greenAccent,
-                              fontSize: 28, fontWeight: FontWeight.bold),
+                          '${winRate.toStringAsFixed(1)}%',
+                          style: const TextStyle(
+                              color: Colors.greenAccent,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                   ),
-                  // No bottom logo, no extra spacing that forces scroll
                 ],
               ),
             );
@@ -125,35 +116,48 @@ class _RecordsScreenState extends State<RecordsScreen> {
     );
   }
 
-  /// Single stat row card with icon, label, and bold value.
-  Widget _buildStatCard(BuildContext context, String label, String value,
-      Color color, IconData icon) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withAlpha(80), width: 1.2),
-        boxShadow: [BoxShadow(color: color.withAlpha(60),
-            blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withAlpha(51), borderRadius: BorderRadius.circular(12),
+  /// Compact stat row — constrained to max 60dp height.
+  Widget _compactStat(String label, String value, Color color, IconData icon) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 60),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withAlpha(70), width: 1),
+          boxShadow: [
+            BoxShadow(
+                color: color.withAlpha(40),
+                blurRadius: 6,
+                offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                  color: color.withAlpha(40),
+                  borderRadius: BorderRadius.circular(9)),
+              child: Icon(icon, color: color, size: 18),
             ),
-            child: Icon(icon, color: color, size: 26),
-          ),
-          const SizedBox(width: 18),
-          Expanded(child: Text(label,
-              style: const TextStyle(color: Colors.white, fontSize: 17,
-                  fontWeight: FontWeight.w600))),
-          Text(value, style: TextStyle(color: color, fontSize: 28,
-              fontWeight: FontWeight.bold)),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(label,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600)),
+            ),
+            Text(value,
+                style: TextStyle(
+                    color: color,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold)),
+          ],
+        ),
       ),
     );
   }

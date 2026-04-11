@@ -12,6 +12,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
+// LevelUnlockService — persists highest unlocked level after a victory
+import '../services/level_unlock_service.dart';
 import '../utils/app_colors.dart';
 
 // ── Direction enum ────────────────────────────────────────────────────────────
@@ -149,12 +151,15 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     _audio.playWinSound();
     setState(() => victory = true);
     if (mounted) {
+      // Record win stats via GameProvider (syncs to Supabase game_stats table)
       context.read<GameProvider>().recordLevelComplete(
             level: levelNumber,
             time: 60 - secondsLeft,
             lives: lives,
           );
     }
+    // Unlock the next level persistently so LevelSelectScreen sees it on pop
+    LevelUnlockService.instance.unlockLevel(levelNumber + 1);
   }
 
   /// Checks whether arrow can slide out in its escape direction without
@@ -456,9 +461,8 @@ class BentArrowPainter extends CustomPainter {
     _drawPolyline(canvas, pts, shaftPaint, Offset.zero);
 
     // ── Draw shaft border ────────────────────────────────────────────────────
-    // Border paint omitted — shadow covers it; kept as reference below if needed:
-    // Paint()..color = Colors.white30..style = PaintingStyle.stroke
-    //   ..strokeWidth = shaft * 2 + 2..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round;
+    // Border paint removed — shadow covers it, so it is not drawn.
+    // The variable was previously declared but never used (lint: unused_local_variable).
 
     // ── Draw arrowhead ───────────────────────────────────────────────────────
     _drawHead(canvas, pts.last, tip, headLen, headWidth, color);
@@ -584,12 +588,15 @@ mixin LevelStateMixin<T extends StatefulWidget> on State<T> {
     _audio.playWinSound();
     setState(() => victory = true);
     if (mounted) {
+      // Record win stats via GameProvider (syncs to Supabase game_stats table)
       context.read<GameProvider>().recordLevelComplete(
             level: levelNumber,
             time: 60 - secondsLeft,
             lives: lives,
           );
     }
+    // Unlock the next level persistently so LevelSelectScreen sees it on pop
+    LevelUnlockService.instance.unlockLevel(levelNumber + 1);
   }
 
   bool canSlide(ArrowData arrow) {

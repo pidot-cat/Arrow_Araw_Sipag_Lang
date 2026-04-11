@@ -103,21 +103,26 @@ class SettingsScreen extends StatelessWidget {
                     setDialogState(() { isLoading = true; errorMsg = null; });
 
                     final authProvider =
-                        Provider.of<AuthProvider>(context, listen: false);
+                        Provider.of<AuthProvider>(ctx, listen: false);
                     final gameProvider =
-                        Provider.of<GameProvider>(context, listen: false);
-                    final navigator = Navigator.of(context);
-                    final dialogNavigator = Navigator.of(ctx);
+                        Provider.of<GameProvider>(ctx, listen: false);
 
+                    // 1. Wipe remote + local stats FIRST while session is still valid
+                    await gameProvider.resetStats();
+
+                    // 2. Proceed with account deletion (also deletes DB rows)
                     final result = await authProvider.deleteAccount(pass);
                     if (!ctx.mounted) return;
 
                     if (result == null) {
-                      // Account deleted — also wipe game stats so records reset
+                      // Account deleted — also wipe local game stats so records reset
                       await gameProvider.resetStats();
-                      dialogNavigator.pop();
+                      Navigator.pop(ctx);
                       AudioService().stopAll();
-                      navigator.pushNamedAndRemoveUntil('/login', (r) => false);
+                      if (context.mounted) {
+                        Navigator.pushNamedAndRemoveUntil(
+                            context, '/login', (r) => false);
+                      }
                     } else {
                       setDialogState(() { isLoading = false; errorMsg = result; });
                     }

@@ -10,7 +10,7 @@ import '../widgets/gradient_button.dart';
 import '../widgets/gradient_input_field.dart';
 import '../utils/constants.dart';
 
-// ── EmailJS credentials ───────────────────────────────────────────────────
+// ── EmailJS credentials (UPDATED) ──────────────────────────────────────────
 // Template variables expected: {{from_email}}, {{message}}, {{to_email}}
 const String _kServiceId  = 'service_vtus5km';
 const String _kTemplateId = 'template_eb907ud';
@@ -59,6 +59,7 @@ class _ContactScreenState extends State<ContactScreen> {
 
     try {
       // POST to EmailJS REST endpoint
+      // NOTE: Using the public key in 'user_id' as required by EmailJS API.
       final response = await http.post(
         Uri.parse(_kEndpoint),
         headers: {'Content-Type': 'application/json'},
@@ -79,12 +80,14 @@ class _ContactScreenState extends State<ContactScreen> {
       if (response.statusCode == 200) {
         _emailController.clear();
         _problemController.clear();
-        _showSnackBar("Message sent! We'll get back to you soon.", Colors.green);
+        _showSnackBar("Message sent! Feedback received at arrowarawsipaglang@gmail.com", Colors.green);
       } else {
+        debugPrint('EmailJS Error: ${response.body}');
         _showSnackBar('Failed to send. Please try again later.', Colors.red);
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      debugPrint('Network error: $e');
       _showSnackBar('Network error. Check your connection and try again.', Colors.red);
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -158,7 +161,7 @@ class _ContactScreenState extends State<ContactScreen> {
                 ),
                 child: Column(
                   children: [
-                    const Text('Other ways to reach us:',
+                    const Text('Feedback Email:',
                         style: TextStyle(color: Colors.white, fontSize: 15,
                             fontWeight: FontWeight.bold)),
                     const SizedBox(height: 14),

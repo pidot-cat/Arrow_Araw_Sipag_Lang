@@ -1,14 +1,13 @@
 // splash_screen.dart
-// Launch screen. Checks real internet connectivity before navigating.
+// Launch screen with mandatory connectivity check.
 //
 // KEY BEHAVIOURS:
-//   • Online + logged-in (session persisted)  → go directly to /home (no login needed)
-//   • Online + not logged-in                  → go to /login
-//   • Offline + previously logged-in          → go directly to /home (session cached)
-//   • Offline + never logged-in               → show persistent snackbar, keep polling
+//   • Online + logged-in  → go directly to /home
+//   • Online + not logged-in → go to /login
+//   • Offline (any state) → stay on splash with persistent Snackbar, keep polling
 //
-// The app NEVER forces a re-login when the user is already logged in,
-// regardless of whether the device is currently online.
+// The app blocks navigation entirely when offline — even for previously
+// logged-in users — until a real internet connection is restored.
 
 import 'dart:async';
 import 'dart:io';
@@ -64,27 +63,25 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(AppConstants.splashDuration);
     if (!mounted) return;
 
-    // Wait for AuthProvider to finish reading from SharedPreferences
+    // MANDATORY connectivity check — blocks ALL navigation when offline
+    final online = await _hasInternet();
+    if (!mounted) return;
+
+    if (!online) {
+      _showNoInternetSnackBar();
+      _retryWhenOnline();
+      return;
+    }
+
+    // Online: check auth state and route accordingly
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (!auth.isReady) await _waitForAuthReady(auth);
     if (!mounted) return;
 
-    // If the user was already logged in (cached session), send them home
-    // immediately — even if currently offline.
     if (auth.isLoggedIn) {
       _goHome();
-      return;
-    }
-
-    // Not logged in: we need internet to reach the login/signup screens.
-    final online = await _hasInternet();
-    if (!mounted) return;
-
-    if (online) {
-      _goLogin();
     } else {
-      _showNoInternetSnackBar();
-      _retryWhenOnline();
+      _goLogin();
     }
   }
 
@@ -104,7 +101,7 @@ class _SplashScreenState extends State<SplashScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
-          'No internet connection. Please connect to continue.',
+          'Please check your internet connection.',
           style: TextStyle(color: Colors.white),
         ),
         backgroundColor: Colors.redAccent,
@@ -129,8 +126,11 @@ class _SplashScreenState extends State<SplashScreen>
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       _snackBarShown = false;
 
-      // Re-check auth state (may have been updated while polling)
+      // Re-check auth state
       final auth = Provider.of<AuthProvider>(context, listen: false);
+      if (!auth.isReady) await _waitForAuthReady(auth);
+      if (!mounted) return;
+
       if (auth.isLoggedIn) {
         _goHome();
       } else {

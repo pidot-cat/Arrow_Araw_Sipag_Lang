@@ -212,9 +212,16 @@ class GameProvider with ChangeNotifier {
   }
 
   /// Clears all stats locally and in Supabase. Called on account deletion.
+  /// Saves zeroed stats so any re-registration sees clean history.
   Future<void> resetStats() async {
     _stats = GameStatsModel();
     await _saveLocalStats();
+    // Also zero-out the remote record so re-registration starts fresh
+    try {
+      await SupabaseService.saveGameStats(_stats);
+    } catch (e) {
+      debugPrint('resetStats remote error (non-fatal): $e');
+    }
     notifyListeners();
   }
 

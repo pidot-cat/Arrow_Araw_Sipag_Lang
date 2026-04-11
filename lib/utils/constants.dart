@@ -25,6 +25,8 @@ class AppConstants {
   static const String keyTotalDays = 'total_days';
   static const String keyUsername = 'username';
   static const String keyIsLoggedIn = 'is_logged_in';
+  // Key for storing the highest unlocked level in SharedPreferences
+  static const String keyHighestUnlockedLevel = 'highest_unlocked_level';
 
   // Asset Paths — Images
   static const String logoWithBg = 'assets/images/LOGO.png';

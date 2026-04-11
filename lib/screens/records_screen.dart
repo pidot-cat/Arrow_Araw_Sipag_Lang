@@ -1,6 +1,7 @@
 // records_screen.dart
 // Shows player game statistics pulled from Supabase (with local SharedPrefs cache).
-// Logo enlarged to 200px. Faint duplicate logo at the bottom has been removed.
+// Fixed layout: no scroll, all content fits on one screen, logo enlarged to 200px,
+// faint duplicate logo at bottom removed.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -35,15 +36,16 @@ class _RecordsScreenState extends State<RecordsScreen> {
         showBackButton: true,
         child: Consumer<GameProvider>(
           builder: (context, gameProvider, child) {
-            return SingleChildScrollView(
+            // Fixed layout — no scrolling
+            return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Column(
                 children: [
-                  SizedBox(height: size.height * 0.055),
+                  SizedBox(height: size.height * 0.04),
 
-                  // Logo — enlarged from 160 to 200 to match other screens
+                  // Logo — enlarged to 200px to match other screens
                   Image.asset(AppConstants.logoWithBg, width: 200, height: 200),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
                   // Screen title
                   const Text(
@@ -54,30 +56,30 @@ class _RecordsScreenState extends State<RecordsScreen> {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  SizedBox(height: size.height * 0.03),
+                  SizedBox(height: size.height * 0.025),
 
                   // Individual stat cards
                   _buildStatCard(context, 'Total Wins',
                       gameProvider.stats.totalWins.toString(),
                       Colors.greenAccent, Icons.emoji_events_rounded),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   _buildStatCard(context, 'Total Losses',
                       gameProvider.stats.totalLosses.toString(),
                       Colors.redAccent, Icons.close_rounded),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   _buildStatCard(context, 'Total Matches',
                       gameProvider.stats.totalMatches.toString(),
                       Colors.cyanAccent, Icons.sports_esports_rounded),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   _buildStatCard(context, 'Total Days',
                       gameProvider.stats.totalDays.toString(),
                       Colors.orangeAccent, Icons.calendar_today_rounded),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
                   // Win rate gradient card
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
                     decoration: BoxDecoration(
                       gradient: AppColors.primaryGradient,
                       borderRadius: BorderRadius.circular(18),
@@ -113,9 +115,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
                       ],
                     ),
                   ),
-
-                  // Bottom spacing — no duplicate logo here (removed)
-                  SizedBox(height: size.height * 0.04),
+                  // No bottom logo, no extra spacing that forces scroll
                 ],
               ),
             );
@@ -130,7 +130,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
       Color color, IconData icon) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),

@@ -1,15 +1,19 @@
 // lib/screens/level_select_screen.dart
-// ─────────────────────────────────────────────────────────────────────────────
-// Level selection screen with:
-//   • Lock / unlock state persisted via LevelUnlockService
-//   • Animated unlock pulse when a new level is unlocked
-//   • Each card navigates to the correct GameScreenLvlX widget
-// ─────────────────────────────────────────────────────────────────────────────
+// Grid of 10 level cards.  Cards are LOCKED (greyed-out padlock icon,
+// non-tappable) for any level whose number exceeds
+// GameProvider.highestUnlockedLevel.
+//
+// Unlock rule:
+//   • New accounts start at highestUnlockedLevel = 1 (only Level 1 tappable).
+//   • Completing Level N calls GameProvider.unlockNextLevel(N) which sets
+//     highestUnlockedLevel = N + 1 and persists to both SharedPreferences
+//     and the Supabase `level_progress` table.
+//   • The selector rebuilds via Consumer<GameProvider> so it reflects the
+//     new unlock instantly after returning from a level.
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-
-// Level screen imports — one per level
+import 'package:provider/provider.dart';
+import '../providers/game_provider.dart';
 import '../levels/game_screen_lvl_1.dart';
 import '../levels/game_screen_lvl_2.dart';
 import '../levels/game_screen_lvl_3.dart';
@@ -21,69 +25,58 @@ import '../levels/game_screen_lvl_8.dart';
 import '../levels/game_screen_lvl_9.dart';
 import '../levels/game_screen_lvl_10.dart';
 
-// Service that handles persistent unlock state
-import '../services/level_unlock_service.dart';
-
-class LevelSelectScreen extends StatefulWidget {
+class LevelSelectScreen extends StatelessWidget {
   const LevelSelectScreen({super.key});
 
-  @override
-  State<LevelSelectScreen> createState() => _LevelSelectScreenState();
-}
-
-class _LevelSelectScreenState extends State<LevelSelectScreen> {
-  // Highest level the player may currently enter (1–10)
-  int _highestUnlocked = 1;
-
-  // Level that was just newly unlocked (drives the reveal animation)
-  int? _justUnlockedLevel;
-
-  // True while loading persisted data from storage
-  bool _loading = true;
-
-  // ── Static metadata ───────────────────────────────────────────────────────
-
-  // Display name for the shape of each level
+  // ── Level metadata ────────────────────────────────────────────────────────
+  // Shape names that match the level geometry spec.
   static const List<String> _levelNames = [
-    'Heart', 'Circle', 'Triangle', 'Square', 'Pentagon',
-    'Hexagon', 'Heptagon', 'Shield', 'Nonagon', 'Cross',
+    'Heart',
+    'Circle',
+    'Triangle',
+    'Square',
+    'Pentagon',
+    'Hexagon',
+    'Heptagon',
+    'Shield',
+    'Nonagon',
+    'Cross',
   ];
 
-  // Grid size label for each level
+  // Grid dimensions displayed on each card.
   static const List<String> _levelGrids = [
-    '5×5', '6×6', '7×7', '8×8', '9×9',
-    '10×10', '11×11', '12×12', '13×13', '14×14',
+    '5×5',
+    '6×6',
+    '7×7',
+    '8×8',
+    '9×9',
+    '10×10',
+    '11×11',
+    '12×12',
+    '13×13',
+    '14×14',
   ];
 
-  // Accent colour for each level card
+  // Accent colour per level — pairs share a colour to form a visual difficulty
+  // gradient from blue (easy) to purple (master).
   static const List<Color> _levelColors = [
-    Color(0xFF1E88E5), Color(0xFF00C853), Color(0xFFFFD600), Color(0xFFFFD600),
-    Color(0xFFFF6D00), Color(0xFFFF6D00), Color(0xFFD50000), Color(0xFFD50000),
-    Color(0xFFAA00FF), Color(0xFFAA00FF),
+    Color(0xFF1E88E5), // L1  — Blue     Easy
+    Color(0xFF00C853), // L2  — Green    Easy
+    Color(0xFFFFD600), // L3  — Yellow   Normal
+    Color(0xFFFFD600), // L4  — Yellow   Normal
+    Color(0xFFFF6D00), // L5  — Orange   Hard
+    Color(0xFFFF6D00), // L6  — Orange   Hard
+    Color(0xFFD50000), // L7  — Red      Expert
+    Color(0xFFD50000), // L8  — Red      Expert
+    Color(0xFFAA00FF), // L9  — Purple   Master
+    Color(0xFFAA00FF), // L10 — Purple   Master
   ];
 
-  // ── Lifecycle ─────────────────────────────────────────────────────────────
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUnlockState();
-  }
-
-  // Reads highest unlocked level from SharedPreferences / Supabase
-  Future<void> _loadUnlockState() async {
-    final level = await LevelUnlockService.instance.loadHighestUnlocked();
-    if (!mounted) return;
-    setState(() {
-      _highestUnlocked = level;
-      _loading = false;
-    });
-  }
-
-  // ── Navigation helpers ────────────────────────────────────────────────────
-
-  // Returns the Widget for the given level number
-  Widget _levelScreen(int level) {
+  // ── Level screen factory ──────────────────────────────────────────────────
+  /// Returns the correct level screen widget for [level] (1-indexed).
+  /// Each level screen is self-contained with its own arrow data; the generic
+  /// GameScreen is NOT used.
+  static Widget _levelScreen(int level) {
     switch (level) {
       case 1:  return const GameScreenLvl1();
       case 2:  return const GameScreenLvl2();
@@ -99,29 +92,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
     }
   }
 
-  // Opens a level and refreshes unlock state when the player returns
-  Future<void> _openLevel(int level) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => _levelScreen(level)),
-    );
-    if (!mounted) return;
-    final previous = _highestUnlocked;
-    final updated = await LevelUnlockService.instance.loadHighestUnlocked();
-    if (!mounted) return;
-    setState(() {
-      _highestUnlocked = updated;
-      if (updated > previous) _justUnlockedLevel = updated; // trigger anim
-    });
-    // Clear the animation marker after it finishes playing
-    if (_justUnlockedLevel != null) {
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) setState(() => _justUnlockedLevel = null);
-      });
-    }
-  }
-
-  // Maps level number to a difficulty string
+  /// Maps a level number to a human-readable difficulty label.
   String _getDifficulty(int level) {
     if (level <= 2) return 'Easy';
     if (level <= 4) return 'Normal';
@@ -130,11 +101,10 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
     return 'Master';
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
@@ -159,165 +129,177 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
           child: Container(height: 1, color: Colors.white.withAlpha(30)),
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white54))
-          : Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0xFF0A1628), Color(0xFF1A1A2E)],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0A1628), Color(0xFF1A1A2E)],
+          ),
+        ),
+        // Consumer<GameProvider> rebuilds the grid whenever highestUnlockedLevel
+        // changes — e.g. immediately after returning from a won level.
+        child: Consumer<GameProvider>(
+          builder: (context, gameProvider, _) {
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: GridView.builder(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: size.width > 600 ? 4 : 2,
+                  crossAxisSpacing: 14,
+                  mainAxisSpacing: 14,
+                  childAspectRatio: 0.95,
                 ),
+                itemCount: 10,
+                itemBuilder: (context, index) {
+                  final level = index + 1;
+                  // A level is unlocked when its number is ≤ the player's
+                  // current frontier.
+                  final isUnlocked =
+                      level <= gameProvider.highestUnlockedLevel;
+                  return _buildLevelCard(
+                      context, level, isUnlocked);
+                },
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: GridView.builder(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: size.width > 600 ? 4 : 2,
-                    crossAxisSpacing: 14,
-                    mainAxisSpacing: 14,
-                    childAspectRatio: 0.95,
-                  ),
-                  itemCount: 10,
-                  itemBuilder: (ctx, i) => _buildCard(ctx, i + 1),
-                ),
-              ),
-            ),
-    );
-  }
-
-  // Decides whether to render a locked or unlocked card
-  Widget _buildCard(BuildContext context, int level) {
-    final color = _levelColors[level - 1];
-    final unlocked = level <= _highestUnlocked;
-    final justUnlocked = level == _justUnlockedLevel;
-
-    if (!unlocked) return _lockedCard(level);
-
-    Widget card = _unlockedCard(context, level, color, justUnlocked);
-
-    // Play elastic scale + shimmer animation on the newly unlocked card
-    if (justUnlocked) {
-      card = card
-          .animate()
-          .scale(
-            begin: const Offset(0.75, 0.75),
-            end: const Offset(1.0, 1.0),
-            duration: 700.ms,
-            curve: Curves.elasticOut,
-          )
-          .shimmer(duration: 900.ms, color: color.withAlpha(200));
-    }
-    return card;
-  }
-
-  // Greyed-out card with lock icon — not tappable
-  Widget _lockedCard(int level) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0D1B2A),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white12, width: 1.5),
-        boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3)),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.lock_rounded, color: Colors.white24, size: 34),
-          const SizedBox(height: 6),
-          const Text('LVL',
-              style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.white24,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2)),
-          Text('$level',
-              style: const TextStyle(
-                  fontSize: 34,
-                  color: Colors.white24,
-                  fontWeight: FontWeight.bold,
-                  height: 1.0)),
-          const SizedBox(height: 4),
-          Text(_levelNames[level - 1],
-              style: const TextStyle(fontSize: 11, color: Colors.white24),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  // Coloured, tappable card for an unlocked level
-  Widget _unlockedCard(
-      BuildContext context, int level, Color color, bool highlighted) {
+  /// Builds one level card.  Locked cards show a padlock overlay and ignore
+  /// tap events; unlocked cards navigate to the corresponding level screen.
+  Widget _buildLevelCard(
+      BuildContext context, int level, bool isUnlocked) {
+    final color      = _levelColors[level - 1];
+    final difficulty = _getDifficulty(level);
+    final name       = _levelNames[level - 1];
+    final grid       = _levelGrids[level - 1];
+
+    // Locked levels get a muted colour so they visually recede.
+    final displayColor = isUnlocked ? color : Colors.grey.shade700;
+
     return InkWell(
-      onTap: () => _openLevel(level),
+      // Locked levels are not tappable — onTap is null.
+      onTap: isUnlocked
+          ? () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => _levelScreen(level)),
+              )
+          : null,
       borderRadius: BorderRadius.circular(18),
-      splashColor: color.withAlpha(60),
-      highlightColor: color.withAlpha(30),
+      splashColor: isUnlocked ? color.withAlpha(60) : null,
+      highlightColor: isUnlocked ? color.withAlpha(30) : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
-          color: const Color(0xFF0D1B2A),
+          // Locked cards have a darker background to signal unavailability.
+          color: isUnlocked
+              ? const Color(0xFF0D1B2A)
+              : const Color(0xFF080F1A),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: highlighted ? color.withAlpha(230) : color.withAlpha(160),
-            width: highlighted ? 2.5 : 1.8,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: color.withAlpha(highlighted ? 160 : 80),
-              blurRadius: highlighted ? 22 : 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+              color: displayColor.withAlpha(isUnlocked ? 160 : 60),
+              width: 1.8),
+          boxShadow: isUnlocked
+              ? [
+                  BoxShadow(
+                      color: color.withAlpha(80),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4))
+                ]
+              : [],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
           children: [
-            Text('LVL',
-                style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.white.withAlpha(120),
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2)),
-            Text('$level',
-                style: TextStyle(
-                    fontSize: 38,
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    height: 1.0,
-                    shadows: [
-                      Shadow(color: color.withAlpha(180), blurRadius: 12)
-                    ])),
-            const SizedBox(height: 3),
-            Text(_levelNames[level - 1],
-                style: const TextStyle(fontSize: 11, color: Colors.white70),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 2),
-            Text(_levelGrids[level - 1],
-                style:
-                    TextStyle(fontSize: 10, color: Colors.white.withAlpha(100))),
-            const SizedBox(height: 5),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-              decoration: BoxDecoration(
-                color: color.withAlpha(40),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: color.withAlpha(80), width: 1),
+            // ── Level info ──────────────────────────────────────────────
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'LVL',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withAlpha(isUnlocked ? 120 : 60),
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2),
+                  ),
+                  Text(
+                    '$level',
+                    style: TextStyle(
+                        fontSize: 38,
+                        color: displayColor,
+                        fontWeight: FontWeight.bold,
+                        height: 1.0,
+                        shadows: isUnlocked
+                            ? [
+                                Shadow(
+                                    color: color.withAlpha(180),
+                                    blurRadius: 12)
+                              ]
+                            : []),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    name,
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: isUnlocked
+                            ? Colors.white70
+                            : Colors.white.withAlpha(60)),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    grid,
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.white.withAlpha(isUnlocked ? 100 : 40)),
+                  ),
+                  const SizedBox(height: 5),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: displayColor.withAlpha(isUnlocked ? 40 : 15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: displayColor
+                              .withAlpha(isUnlocked ? 80 : 30),
+                          width: 1),
+                    ),
+                    child: Text(
+                      difficulty,
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: displayColor,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5),
+                    ),
+                  ),
+                ],
               ),
-              child: Text(_getDifficulty(level),
-                  style: TextStyle(
-                      fontSize: 10,
-                      color: color,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5)),
             ),
+
+            // ── Padlock overlay for locked levels ────────────────────────
+            if (!isUnlocked)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(120),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(Icons.lock_rounded,
+                      color: Colors.white54, size: 16),
+                ),
+              ),
           ],
         ),
       ),

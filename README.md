@@ -14,7 +14,7 @@ A vibrant arrow puzzle escape mobile game built with Flutter.
 
 #### 🎮 Game Levels
 
-| Level |  Grid |  Shape   | Arrows |
+| Level | Grid  |  Shape   | Arrows |
 |-------|-------|----------|--------|
 |   1   | 5×5   | Heart    |   13   |
 |   2   | 6×6   | Circle   |   20   |
@@ -25,7 +25,7 @@ A vibrant arrow puzzle escape mobile game built with Flutter.
 |   7   | 11×11 | Heptagon |   55   |
 |   8   | 12×12 | Shield   |   62   |
 |   9   | 13×13 | Nonagon  |   70   |
-|  10   | 14×14 | Cross    |   66   |
+|   10  | 14×14 | Cross    |   66   |
 
 #### ⚙️ Other Screens
 
@@ -73,7 +73,7 @@ A vibrant arrow puzzle escape mobile game built with Flutter.
 ```text
 lib/
 ├── levels/
-│   ├── level_base.dart          
+│   ├── level_base.dart          ← Shared painter, mixins, arrow models
 │   ├── game_screen_lvl_1.dart
 │   ├── game_screen_lvl_2.dart
 │   ├── game_screen_lvl_3.dart
@@ -81,9 +81,9 @@ lib/
 │   ├── game_screen_lvl_5.dart
 │   ├── game_screen_lvl_6.dart
 │   ├── game_screen_lvl_7.dart
-│   ├── game_screen_lvl_8.dart   
+│   ├── game_screen_lvl_8.dart   ← Shield shape, 12×12, 62 arrows
 │   ├── game_screen_lvl_9.dart
-│   └── game_screen_lvl_10.dart  
+│   └── game_screen_lvl_10.dart  ← Cross shape, 14×14, 66 arrows
 ├── models/
 │   ├── arrow_model.dart
 │   └── game_stats_model.dart

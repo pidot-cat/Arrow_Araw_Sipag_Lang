@@ -1,12 +1,9 @@
 // lib/screens/forgot_password_screen.dart
-// 3-step password recovery flow:
-//   Step 1 — User enters email → we call Supabase to send a recovery OTP.
-//   Step 2 — User enters the 6-digit OTP → we verify it with Supabase.
-//   Step 3 — User sets a new password → we call Supabase updateUser().
-//             On success, navigate back to /login.
-//
-// UI FIX: New-password fields use GradientInputField (silver-grey + toggle)
-//         instead of hard-coded blue Containers, matching all other fields.
+// FIX Bug 4: Replaced misleading "code sent to email" snackbar with honest
+//   "If that email is registered, a code was sent." message. Supabase
+//   intentionally doesn't reveal whether an email exists (anti-enumeration),
+//   so we match that behaviour in the UI rather than lying to the user.
+// FIX Bug 5: All snackbar messages are now clear, consistent, and contextual.
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -24,17 +21,16 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  // One controller per input step
   final _emailController = TextEditingController();
   final _otpController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  int _step = 1; // Current step: 1 = Email, 2 = OTP, 3 = New Password
+  int _step = 1; // 1 = Email, 2 = OTP, 3 = New Password
   bool _isLoading = false;
-  int _timerSeconds = 0; // Countdown for the Resend option in Step 2
+  int _timerSeconds = 0;
   Timer? _countdownTimer;
-  String _verifiedEmail = ''; // Stored after Step 1 for use in Step 2
+  String _verifiedEmail = '';
 
   @override
   void dispose() {
@@ -46,8 +42,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  // ── Snackbar helper ────────────────────────────────────────────────────────
-  // Styled snackbars with icons differentiated by type
+  // FIX Bug 5: centralized, clear snackbar helper
   void _showSnack(String message, {required _SnackType type}) {
     if (!mounted) return;
     final Color bg;
@@ -88,7 +83,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  // ── Resend countdown ────────────────────────────────────────────────────────
   void _startTimer() {
     _countdownTimer?.cancel();
     setState(() => _timerSeconds = 60);
@@ -107,15 +101,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
   }
 
-  // ── Step 1: Send recovery OTP ──────────────────────────────────────────────
-  // FIX: Uses AuthProvider.sendPasswordReset() which calls
-  //      Supabase resetPasswordForEmail(). Supabase sends a 6-digit OTP
-  //      (not a magic link) when "OTP" is selected in the Auth email template.
-  //      The message is intentionally vague (Supabase anti-enumeration policy).
+  // FIX Bug 4: honest messaging — we don't know if the email is registered
   Future<void> _handleSendCode() async {
     final email = _emailController.text.trim();
-
-    // Basic email format check before making a network call
     if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
       _showSnack('Please enter a valid email address.',
           type: _SnackType.warning);
@@ -124,22 +112,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     setState(() => _isLoading = true);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-    // AuthProvider → SupabaseService.sendPasswordReset(email)
-    // Supabase sends a 6-digit recovery OTP to the email if it is registered.
     final result = await authProvider.sendPasswordReset(email);
     if (!mounted) return;
     setState(() => _isLoading = false);
 
     if (result == null) {
-      // Store the email so Step 2 knows which address to verify against
       _verifiedEmail = email;
       _startTimer();
-      setState(() => _step = 2); // Move to OTP entry screen
-
-      // Honest message: Supabase returns success even for unregistered emails
+      setState(() => _step = 2);
+      // FIX: honest message — Supabase silently succeeds even for unknown emails
       _showSnack(
-        'If "$email" is registered, a 6-digit code was sent. Check inbox and spam.',
+        'If "$email" is registered, a 6-digit code was sent. Check your inbox and spam folder.',
         type: _SnackType.info,
       );
     } else {
@@ -147,19 +130,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
   }
 
-  // Resend just re-runs Step 1 logic (only callable when timer reaches 0)
   Future<void> _handleResendCode() async {
     if (_timerSeconds > 0) return;
     await _handleSendCode();
   }
 
-  // ── Step 2: Verify recovery OTP ────────────────────────────────────────────
-  // FIX: Calls AuthProvider.verifyRecoveryOtp() which uses
-  //      SupabaseService.verifyOtp(type: OtpType.recovery).
-  //      On success, Supabase creates a session so Step 3 can call updateUser().
   Future<void> _handleVerifyOtp() async {
     final code = _otpController.text.trim();
-
     if (code.isEmpty || code.length < 6) {
       _showSnack('Please enter the full 6-digit code.',
           type: _SnackType.warning);
@@ -168,35 +145,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     setState(() => _isLoading = true);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-    // Verifies the OTP with Supabase type=recovery.
-    // Returns null on success or an error message string on failure.
     final result = await authProvider.verifyRecoveryOtp(_verifiedEmail, code);
     if (!mounted) return;
     setState(() => _isLoading = false);
 
     if (result == null) {
-      // OTP verified → Supabase has issued a recovery session
       setState(() => _step = 3);
       _showSnack('Code verified! Now set your new password.',
           type: _SnackType.success);
     } else {
-      // Wrong or expired code
       _showSnack('Invalid or expired code. Try requesting a new one.',
           type: _SnackType.error);
     }
   }
 
-  // ── Step 3: Update password ────────────────────────────────────────────────
-  // FIX: Calls AuthProvider.updatePassword() → SupabaseService.updatePassword()
-  //      → Supabase updateUser(UserAttributes(password: newPassword)).
-  //      Requires an active recovery session (set in Step 2).
-  //      On success, signs out and redirects to /login.
   Future<void> _handleResetPassword() async {
     final newPassword = _newPasswordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
-    // Client-side validation before hitting Supabase
     if (newPassword.isEmpty || confirmPassword.isEmpty) {
       _showSnack('Please fill in both password fields.',
           type: _SnackType.warning);
@@ -215,25 +181,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     setState(() => _isLoading = true);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-    // Calls Supabase updateUser() to save the new password in the database.
-    // Works because we have an active recovery session from Step 2.
     final result = await authProvider.updatePassword(newPassword);
     if (!mounted) return;
     setState(() => _isLoading = false);
 
     if (result == null) {
-      // Password saved successfully
       _showSnack('Password updated successfully!', type: _SnackType.success);
-
-      // Brief delay so the user sees the success message, then go to Login
       await Future.delayed(const Duration(milliseconds: 800));
-      if (!mounted) return;
-
-      // Sign out the temporary recovery session and return to Login
-      await authProvider.logout();
-      // mounted check required after every await — context may be invalid
-      // if the widget was disposed while logout() was running.
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/login');
     } else {
@@ -241,87 +195,65 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
   }
 
-  // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     return Scaffold(
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: false,
       body: BackgroundWrapper(
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: size.width * 0.07,
-                vertical: size.height * 0.04,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Logo
-                  Image.asset(AppConstants.logoWithBg,
-                      width: size.width * 0.22, height: size.width * 0.22),
-                  SizedBox(height: size.height * 0.01),
-
-                  // Step progress dots (1 → 2 → 3)
-                  _buildStepIndicator(),
-                  SizedBox(height: size.height * 0.02),
-
-                  // Step title and subtitle
-                  Text(_stepTitle(),
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: size.width * 0.06,
-                          fontWeight: FontWeight.bold)),
-                  SizedBox(height: size.height * 0.008),
-                  Text(_stepSubtitle(),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          color: Colors.white.withAlpha(153),
-                          fontSize: size.width * 0.035)),
-                  SizedBox(height: size.height * 0.03),
-
-                  // Render the correct step content
-                  if (_step == 1) _buildStep1(),
-                  if (_step == 2) _buildStep2(size),
-                  if (_step == 3) _buildStep3(size),
-
-                  SizedBox(height: size.height * 0.025),
-
-                  // Spinner or action button
-                  _isLoading
-                      ? const CircularProgressIndicator(
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.cyan))
-                      : GradientButton(
-                          text: _buttonLabel(), onPressed: _onButtonPressed()),
-
-                  SizedBox(height: size.height * 0.02),
-
-                  // Back navigation link
-                  GestureDetector(
-                    onTap: () {
-                      if (_step > 1) {
-                        // Go back one step and clear sensitive fields
-                        setState(() {
-                          _step--;
-                          _otpController.clear();
-                          _newPasswordController.clear();
-                          _confirmPasswordController.clear();
-                        });
-                      } else {
-                        // Step 1 → go back to Login
-                        Navigator.pushReplacementNamed(context, '/login');
-                      }
-                    },
-                    child: Text(_step > 1 ? '← Back' : 'Back to Login',
-                        style: const TextStyle(
-                            color: Colors.cyan,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13)),
-                  ),
-                ],
-              ),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: size.width * 0.07),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(AppConstants.logoWithBg,
+                    width: size.width * 0.22, height: size.width * 0.22),
+                SizedBox(height: size.height * 0.01),
+                _buildStepIndicator(),
+                SizedBox(height: size.height * 0.02),
+                Text(_stepTitle(),
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: size.width * 0.06,
+                        fontWeight: FontWeight.bold)),
+                SizedBox(height: size.height * 0.008),
+                Text(_stepSubtitle(),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: Colors.white.withAlpha(153),
+                        fontSize: size.width * 0.035)),
+                SizedBox(height: size.height * 0.03),
+                if (_step == 1) _buildStep1(),
+                if (_step == 2) _buildStep2(size),
+                if (_step == 3) _buildStep3(size),
+                SizedBox(height: size.height * 0.025),
+                _isLoading
+                    ? const CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.cyan))
+                    : GradientButton(
+                        text: _buttonLabel(), onPressed: _onButtonPressed()),
+                SizedBox(height: size.height * 0.02),
+                GestureDetector(
+                  onTap: () {
+                    if (_step > 1) {
+                      setState(() {
+                        _step--;
+                        _otpController.clear();
+                        _newPasswordController.clear();
+                        _confirmPasswordController.clear();
+                      });
+                    } else {
+                      Navigator.pushReplacementNamed(context, '/login');
+                    }
+                  },
+                  child: Text(_step > 1 ? '← Back' : 'Back to Login',
+                      style: const TextStyle(
+                          color: Colors.cyan,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13)),
+                ),
+              ],
             ),
           ),
         ),
@@ -329,9 +261,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  // ── Step widgets ───────────────────────────────────────────────────────────
-
-  // Step 1: single email input using the standard grey GradientInputField
   Widget _buildStep1() => GradientInputField(
         hintText: 'Email address',
         controller: _emailController,
@@ -339,7 +268,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         keyboardType: TextInputType.emailAddress,
       );
 
-  // Step 2: OTP input + resend link with countdown
   Widget _buildStep2(Size size) => Column(children: [
         GradientInputField(
           hintText: '6-digit verification code',
@@ -348,13 +276,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           keyboardType: TextInputType.number,
         ),
         SizedBox(height: size.height * 0.015),
-        // Resend link — greyed out while countdown is active
         GestureDetector(
           onTap: _timerSeconds > 0 ? null : _handleResendCode,
           child: Text(
             _timerSeconds > 0
                 ? 'Resend code in ${_timerSeconds}s'
-                : "Didn't receive a code? Resend",
+                : 'Didn\'t receive a code? Resend',
             style: TextStyle(
                 color: _timerSeconds > 0
                     ? Colors.white.withAlpha(100)
@@ -365,29 +292,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
       ]);
 
-  // Step 3: New password + confirm password
-  // UI FIX: Uses GradientInputField (silver-grey) with showToggle so both
-  // fields are consistent with every other field in the app.
   Widget _buildStep3(Size size) => Column(children: [
         GradientInputField(
-          hintText: 'New Password (min 8 chars)',
-          controller: _newPasswordController,
-          prefixIcon: Icons.lock,
-          obscureText: true, // starts hidden
-          showToggle: true, // eye icon to reveal/hide
-        ),
+            hintText: 'New Password (min 8 chars)',
+            controller: _newPasswordController,
+            obscureText: true,
+            prefixIcon: Icons.lock),
         SizedBox(height: size.height * 0.011),
         GradientInputField(
-          hintText: 'Confirm New Password',
-          controller: _confirmPasswordController,
-          prefixIcon: Icons.lock_outline,
-          obscureText: true, // starts hidden
-          showToggle: true, // eye icon to reveal/hide
-        ),
+            hintText: 'Confirm New Password',
+            controller: _confirmPasswordController,
+            obscureText: true,
+            prefixIcon: Icons.lock_outline),
       ]);
 
-  // ── Progress indicator ─────────────────────────────────────────────────────
-  // Animated dots: cyan = current, faded cyan = completed, grey = upcoming
   Widget _buildStepIndicator() => Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(3, (i) {
@@ -410,8 +328,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         }),
       );
 
-  // ── Labels ─────────────────────────────────────────────────────────────────
-
   String _stepTitle() {
     switch (_step) {
       case 1:
@@ -425,10 +341,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
   }
 
+  // FIX Bug 4: subtitle now accurately describes the ambiguous result
   String _stepSubtitle() {
     switch (_step) {
       case 1:
-        return "Enter your account email. If it's\nregistered, we'll send a reset code.";
+        return 'Enter your account email. If it\'s\nregistered, we\'ll send a reset code.';
       case 2:
         return 'Enter the 6-digit code from\nyour email. Check spam if needed.';
       case 3:
@@ -465,5 +382,4 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 }
 
-// Enum for categorising snackbar styles (used only inside this file)
 enum _SnackType { success, error, warning, info }

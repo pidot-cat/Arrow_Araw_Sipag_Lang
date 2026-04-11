@@ -1,7 +1,22 @@
 // lib/levels/game_screen_lvl_4.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// Level 4 — 8×8 Grid — SQUARE shape
-// 8 arrows covering the four sides + four corners. No cell overlaps.
+// Level 4 — 8×8 Grid — Diamond Shape
+// 7 bent arrows, solvable in sequential order (tap 0 → 6).
+//
+// Architecture:
+//   • Uses BentLevelStateMixin from level_base.dart for all game-loop logic
+//     (timer, lives, tap handling, HUD, grid renderer, victory/game-over).
+//   • _shapeCells defines which grid cells form the visual shape background.
+//   • _buildArrows() returns the ordered list of BentArrowData objects.
+//     Arrow id == the solve-order index so tapping them out of order triggers
+//     a wrong-tap (life deduction).
+//   • triggerVictory() (inherited) calls GameProvider.recordLevelComplete()
+//     which in turn calls unlockNextLevel() → Level 5 becomes accessible.
+//
+// Snake-path exit animation:
+//   Each BentArrowData has an [escape] direction.  When tapped correctly,
+//   the arrow widget slides out along that axis via flutter_animate
+//   (.slideX / .slideY / .fadeOut) giving the snake-leaving-grid effect.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
@@ -13,31 +28,41 @@ import 'game_screen_lvl_5.dart';
 
 const int _rows = 8, _cols = 8;
 
-// Square perimeter — rows 1–6, cols 1–6
 const Set<(int, int)> _shapeCells = {
-  (1,1),(1,2),(1,3),(1,4),(1,5),(1,6),
-  (2,1),(2,6),(3,1),(3,6),(4,1),(4,6),(5,1),(5,6),
-  (6,1),(6,2),(6,3),(6,4),(6,5),(6,6),
+  (1,3),
+  (1,4),
+  (2,2),
+  (2,3),
+  (2,4),
+  (2,5),
+  (3,1),
+  (3,2),
+  (3,3),
+  (3,4),
+  (3,5),
+  (3,6),
+  (4,1),
+  (4,2),
+  (4,3),
+  (4,4),
+  (4,5),
+  (4,6),
+  (5,2),
+  (5,3),
+  (5,4),
+  (5,5),
+  (6,3),
+  (6,4),
 };
 
-// Each cell belongs to exactly ONE arrow
 List<BentArrowData> _buildArrows() => [
-  // Arrow 0 — top edge left half, exits up
-  BentArrowData(id:0, segs:[BentCell(1,1),BentCell(1,2),BentCell(1,3)], escape:ArrowDir.up,    color:AppColors.arrowRed),
-  // Arrow 1 — top edge right half, exits up
-  BentArrowData(id:1, segs:[BentCell(1,4),BentCell(1,5),BentCell(1,6)], escape:ArrowDir.up,    color:AppColors.arrowOrange),
-  // Arrow 2 — right side upper, exits right
-  BentArrowData(id:2, segs:[BentCell(2,6),BentCell(3,6)],               escape:ArrowDir.right, color:AppColors.arrowYellow),
-  // Arrow 3 — right side lower, exits right
-  BentArrowData(id:3, segs:[BentCell(4,6),BentCell(5,6)],               escape:ArrowDir.right, color:AppColors.arrowGreen),
-  // Arrow 4 — bottom edge right half, exits down
-  BentArrowData(id:4, segs:[BentCell(6,6),BentCell(6,5),BentCell(6,4)], escape:ArrowDir.down,  color:AppColors.arrowCyan),
-  // Arrow 5 — bottom edge left half, exits down
-  BentArrowData(id:5, segs:[BentCell(6,3),BentCell(6,2),BentCell(6,1)], escape:ArrowDir.down,  color:AppColors.arrowBlue),
-  // Arrow 6 — left side lower, exits left
-  BentArrowData(id:6, segs:[BentCell(5,1),BentCell(4,1)],               escape:ArrowDir.left,  color:AppColors.arrowPurple),
-  // Arrow 7 — left side upper, exits left
-  BentArrowData(id:7, segs:[BentCell(3,1),BentCell(2,1)],               escape:ArrowDir.left,  color:AppColors.arrowPink),
+  BentArrowData(id:0, segs:[BentCell(6,3), BentCell(6,4), BentCell(5,4), BentCell(5,5)], escape:ArrowDir.right, color:AppColors.arrowRed),
+  BentArrowData(id:1, segs:[BentCell(5,2), BentCell(5,3)], escape:ArrowDir.right, color:AppColors.arrowOrange),
+  BentArrowData(id:2, segs:[BentCell(4,3), BentCell(4,4), BentCell(4,5), BentCell(4,6)], escape:ArrowDir.right, color:AppColors.arrowYellow),
+  BentArrowData(id:3, segs:[BentCell(3,1), BentCell(4,1), BentCell(4,2)], escape:ArrowDir.right, color:AppColors.arrowGreen),
+  BentArrowData(id:4, segs:[BentCell(3,4), BentCell(3,3), BentCell(3,2), BentCell(2,2)], escape:ArrowDir.up, color:AppColors.arrowCyan),
+  BentArrowData(id:5, segs:[BentCell(1,4), BentCell(1,3), BentCell(2,3)], escape:ArrowDir.down, color:AppColors.arrowBlue),
+  BentArrowData(id:6, segs:[BentCell(3,6), BentCell(3,5), BentCell(2,5), BentCell(2,4)], escape:ArrowDir.left, color:AppColors.arrowPurple),
 ];
 
 class GameScreenLvl4 extends StatefulWidget {
@@ -55,7 +80,10 @@ class _GameScreenLvl4State extends State<GameScreenLvl4>
   @override Widget Function() get nextLevelBuilder => () => const GameScreenLvl5();
 
   @override
-  void initState() { super.initState(); initLevelState(); }
+  void initState() {
+    super.initState();
+    initLevelState();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,17 +91,29 @@ class _GameScreenLvl4State extends State<GameScreenLvl4>
     return Scaffold(
       backgroundColor: AppColors.darkNavy,
       body: Stack(children: [
-        SafeArea(child: Column(children: [
-          buildHUD(),
-          const SizedBox(height: 6),
-          Text('Level 4 · Square · 8×8',
-              style: TextStyle(color: Colors.white.withValues(alpha:0.5), fontSize:13, letterSpacing:1.2)),
-          const SizedBox(height: 10),
-          Expanded(child: Center(child: buildGrid(cellSize, _shapeCells))),
-        ])),
+        SafeArea(
+          child: Column(children: [
+            buildHUD(),
+            const SizedBox(height: 6),
+            _label(),
+            const SizedBox(height: 10),
+            Expanded(
+              child: Center(child: buildGrid(cellSize, _shapeCells)),
+            ),
+          ]),
+        ),
         if (gameOver) GameOverOverlay(onRetry: restart, onBack: quit),
-        if (victory) VictoryOverlay(isLastLevel: false, onNext: goNextLevel, onBack: quit),
+        if (victory)
+          VictoryOverlay(isLastLevel: false, onNext: goNextLevel, onBack: quit),
       ]),
     );
   }
+
+  Widget _label() => Text(
+    'Level 4 · Diamond · 8×8',
+    style: TextStyle(
+      color: Colors.white.withValues(alpha: 0.5),
+      fontSize: 13,
+      letterSpacing: 1.2),
+  );
 }

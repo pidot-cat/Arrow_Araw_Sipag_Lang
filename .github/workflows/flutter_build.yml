@@ -2,9 +2,9 @@ name: Flutter Build
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -16,11 +16,18 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          # Gagamit tayo ng beta channel para makuha ang Dart SDK 3.8.0+
+          channel: 'beta'
           cache: true
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Analyze project source
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
 
       - name: Build APK
         run: flutter build apk --release

@@ -1,8 +1,3 @@
-// lib/screens/login_screen.dart
-// Login screen — validates email/password then calls AuthProvider.login().
-// UI FIX: Password field now uses GradientInputField with showToggle:true
-//         so it has the same silver-grey background as the Email field.
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -11,6 +6,7 @@ import '../widgets/gradient_button.dart';
 import '../widgets/gradient_input_field.dart';
 import '../utils/constants.dart';
 
+/// Login Screen
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -19,55 +15,41 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Controllers hold the text the user types
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-
-  bool _isLoading = false; // Shows spinner while waiting for Supabase
+  bool _isLoading = false;
 
   @override
   void dispose() {
-    // Always dispose controllers to free memory
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  // ── Login Handler ──────────────────────────────────────────────────────────
   Future<void> _handleLogin() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
-    // Basic empty-field guard before hitting the network
     if (email.isEmpty || password.isEmpty) {
       _showSnackBar('Input Email and Password', Colors.orange);
       return;
     }
 
     setState(() => _isLoading = true);
-
-    // Call AuthProvider which wraps Supabase signInWithPassword()
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final result = await authProvider.login(email, password);
-
     if (!mounted) return;
     setState(() => _isLoading = false);
 
     if (result == null) {
-      // null = success → go to home
       Navigator.pushReplacementNamed(context, '/home');
     } else if (result == 'EMAIL_NOT_CONFIRMED') {
-      // Special signal: user registered but never verified their email
-      _showSnackBar(
-          'Email not confirmed. Please check your inbox or sign up again.',
-          Colors.red);
+      _showSnackBar('Email not confirmed. Please check your inbox or sign up again.', Colors.red);
     } else {
-      // All other Supabase errors (wrong password, rate limit, etc.)
       _showSnackBar(result, Colors.red);
     }
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -82,11 +64,9 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.pushNamed(context, '/forgot-password');
   }
 
-  // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-
     return Scaffold(
       body: BackgroundWrapper(
         child: Center(
@@ -96,15 +76,12 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 SizedBox(height: size.height * 0.06),
-
-                // App logo
                 Image.asset(
                   AppConstants.logoWithBg,
                   width: size.width * 0.38,
                   height: size.width * 0.38,
                 ),
                 SizedBox(height: size.height * 0.025),
-
                 Text(
                   'Welcome Back!',
                   style: TextStyle(
@@ -122,8 +99,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 SizedBox(height: size.height * 0.045),
-
-                // ── Email field ──────────────────────────────────────────────
                 GradientInputField(
                   hintText: 'Email',
                   controller: _emailController,
@@ -131,27 +106,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   keyboardType: TextInputType.emailAddress,
                 ),
                 SizedBox(height: size.height * 0.022),
-
-                // ── Password field ───────────────────────────────────────────
-                // UI FIX: Uses GradientInputField (silver-grey) instead of a
-                // hard-coded blue Container, matching the Email field above.
-                // showToggle:true adds the eye icon for show/hide password.
                 GradientInputField(
                   hintText: 'Password',
                   controller: _passwordController,
+                  obscureText: true,
                   prefixIcon: Icons.lock,
-                  obscureText: true,    // starts hidden
-                  showToggle: true,     // eye icon to reveal/hide
                 ),
-
-                // Forgot password link
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: _handleForgotPassword,
                     style: TextButton.styleFrom(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                     ),
                     child: const Text(
                       'Forgot Password?',
@@ -160,16 +126,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 SizedBox(height: size.height * 0.018),
-
-                // Spinner while loading, button otherwise
                 _isLoading
                     ? const CircularProgressIndicator(
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.cyan))
                     : GradientButton(text: 'LOGIN', onPressed: _handleLogin),
-
                 SizedBox(height: size.height * 0.022),
-
-                // Sign-up link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -178,12 +139,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(color: Colors.white.withAlpha(128)),
                     ),
                     GestureDetector(
-                      onTap: () =>
-                          Navigator.pushReplacementNamed(context, '/signup'),
+                      onTap: () => Navigator.pushReplacementNamed(context, '/signup'),
                       child: const Text(
                         'Sign Up',
-                        style: TextStyle(
-                            color: Colors.cyan, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Colors.cyan, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],

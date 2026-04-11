@@ -107,6 +107,7 @@ class SettingsScreen extends StatelessWidget {
                     final gameProvider =
                         Provider.of<GameProvider>(context, listen: false);
                     final navigator = Navigator.of(context);
+                    final dialogNavigator = Navigator.of(ctx);
 
                     final result = await authProvider.deleteAccount(pass);
                     if (!ctx.mounted) return;
@@ -114,7 +115,7 @@ class SettingsScreen extends StatelessWidget {
                     if (result == null) {
                       // Account deleted — also wipe game stats so records reset
                       await gameProvider.resetStats();
-                      Navigator.pop(ctx);
+                      dialogNavigator.pop();
                       AudioService().stopAll();
                       navigator.pushNamedAndRemoveUntil('/login', (r) => false);
                     } else {

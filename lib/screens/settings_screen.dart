@@ -32,18 +32,21 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
-        bool isLoading   = false;
-        bool obscureText = true;  // Password visibility toggle state
+        bool isLoading = false;
+        bool obscureText = true; // Password visibility toggle state
         String? errorMsg;
 
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return AlertDialog(
               backgroundColor: const Color(0xFF1E1E2E),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               title: const Text('Delete Account',
-                  style: TextStyle(color: Colors.redAccent,
-                      fontWeight: FontWeight.bold, fontSize: 18)),
+                  style: TextStyle(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,39 +97,49 @@ class SettingsScreen extends StatelessWidget {
 
                 // Confirm Delete
                 ElevatedButton(
-                  onPressed: isLoading ? null : () async {
-                    final pass = passCtrl.text.trim();
-                    if (pass.isEmpty) {
-                      setDialogState(() => errorMsg = 'Password is required');
-                      return;
-                    }
-                    setDialogState(() { isLoading = true; errorMsg = null; });
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          final pass = passCtrl.text.trim();
+                          if (pass.isEmpty) {
+                            setDialogState(
+                                () => errorMsg = 'Password is required');
+                            return;
+                          }
+                          setDialogState(() {
+                            isLoading = true;
+                            errorMsg = null;
+                          });
 
-                    final authProvider =
-                        Provider.of<AuthProvider>(ctx, listen: false);
-                    final gameProvider =
-                        Provider.of<GameProvider>(ctx, listen: false);
+                          final authProvider =
+                              Provider.of<AuthProvider>(ctx, listen: false);
+                          final gameProvider =
+                              Provider.of<GameProvider>(ctx, listen: false);
+                          // Capture navigator references before async gaps
+                          final dialogNavigator = Navigator.of(ctx);
+                          final rootNavigator = Navigator.of(context);
 
-                    // 1. Wipe remote + local stats FIRST while session is still valid
-                    await gameProvider.resetStats();
+                          // 1. Wipe remote + local stats FIRST while session is still valid
+                          await gameProvider.resetStats();
 
-                    // 2. Proceed with account deletion (also deletes DB rows)
-                    final result = await authProvider.deleteAccount(pass);
-                    if (!ctx.mounted) return;
+                          // 2. Proceed with account deletion (also deletes DB rows)
+                          final result = await authProvider.deleteAccount(pass);
+                          if (!ctx.mounted) return;
 
-                    if (result == null) {
-                      // Account deleted — also wipe local game stats so records reset
-                      await gameProvider.resetStats();
-                      Navigator.pop(ctx);
-                      AudioService().stopAll();
-                      if (context.mounted) {
-                        Navigator.pushNamedAndRemoveUntil(
-                            context, '/login', (r) => false);
-                      }
-                    } else {
-                      setDialogState(() { isLoading = false; errorMsg = result; });
-                    }
-                  },
+                          if (result == null) {
+                            // Account deleted — also wipe local game stats so records reset
+                            await gameProvider.resetStats();
+                            dialogNavigator.pop();
+                            AudioService().stopAll();
+                            rootNavigator.pushNamedAndRemoveUntil(
+                                '/login', (r) => false);
+                          } else {
+                            setDialogState(() {
+                              isLoading = false;
+                              errorMsg = result;
+                            });
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red.shade800,
                     foregroundColor: Colors.white,
@@ -134,7 +147,9 @@ class SettingsScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10)),
                   ),
                   child: isLoading
-                      ? const SizedBox(width: 18, height: 18,
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
                           child: CircularProgressIndicator(
                               color: Colors.white, strokeWidth: 2))
                       : const Text('Delete',
@@ -152,7 +167,7 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size         = MediaQuery.of(context).size;
+    final size = MediaQuery.of(context).size;
     final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
@@ -166,38 +181,55 @@ class SettingsScreen extends StatelessWidget {
                 SizedBox(height: size.height * 0.01),
 
                 // Compact logo — intentionally small so all tiles fit without scroll
-                Center(child: Image.asset(AppConstants.logoWithBg,
-                    width: 100, height: 100)),
+                Center(
+                    child: Image.asset(AppConstants.logoWithBg,
+                        width: 100, height: 100)),
                 const SizedBox(height: 8),
 
-                const Text('Settings',
-                  style: TextStyle(color: Colors.white, fontSize: 24,
-                      fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                const Text(
+                  'Settings',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
 
                 // Logged-in username label
                 Text('Logged in as: ${authProvider.username}',
-                    style: TextStyle(color: Colors.white.withAlpha(179),
-                        fontSize: 13)),
+                    style: TextStyle(
+                        color: Colors.white.withAlpha(179), fontSize: 13)),
                 const SizedBox(height: 16),
 
                 // Navigation tiles
-                _buildSettingTile(context, 'Contact Us', 'Get help and support',
+                _buildSettingTile(
+                    context,
+                    'Contact Us',
+                    'Get help and support',
                     Icons.contact_support,
                     () => Navigator.pushNamed(context, '/contact')),
                 const SizedBox(height: 10),
-                _buildSettingTile(context, 'Terms of Service', 'Read our terms',
+                _buildSettingTile(
+                    context,
+                    'Terms of Service',
+                    'Read our terms',
                     Icons.description,
                     () => Navigator.pushNamed(context, '/terms')),
                 const SizedBox(height: 10),
-                _buildSettingTile(context, 'Privacy Policy',
-                    'Your privacy matters', Icons.privacy_tip,
+                _buildSettingTile(
+                    context,
+                    'Privacy Policy',
+                    'Your privacy matters',
+                    Icons.privacy_tip,
                     () => Navigator.pushNamed(context, '/policy')),
                 const SizedBox(height: 10),
-                _buildSettingTile(context, 'About Us',
-                    'Learn more about the app', Icons.info,
+                _buildSettingTile(
+                    context,
+                    'About Us',
+                    'Learn more about the app',
+                    Icons.info,
                     () => Navigator.pushNamed(context, '/about')),
 
                 const Spacer(),
@@ -217,7 +249,9 @@ class SettingsScreen extends StatelessWidget {
                       shadowColor: const Color(0xFF8B0000).withAlpha(120),
                     ),
                     child: const Text('LOG OUT',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold,
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
                             letterSpacing: 1.5)),
                   ),
                 ),
@@ -230,13 +264,16 @@ class SettingsScreen extends StatelessWidget {
                     onPressed: () => _showDeleteAccountDialog(context),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.redAccent,
-                      side: const BorderSide(color: Colors.redAccent, width: 1.5),
+                      side:
+                          const BorderSide(color: Colors.redAccent, width: 1.5),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
                     ),
                     child: const Text('DELETE ACCOUNT',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold,
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
                             letterSpacing: 1.2)),
                   ),
                 ),
@@ -266,7 +303,8 @@ class SettingsScreen extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: Colors.cyan.withAlpha(51),
+              decoration: BoxDecoration(
+                  color: Colors.cyan.withAlpha(51),
                   borderRadius: BorderRadius.circular(10)),
               child: Icon(icon, color: Colors.cyan, size: 20),
             ),
@@ -275,15 +313,20 @@ class SettingsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(color: Colors.white,
-                      fontSize: 15, fontWeight: FontWeight.bold)),
+                  Text(title,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold)),
                   const SizedBox(height: 2),
-                  Text(subtitle, style: TextStyle(
-                      color: Colors.white.withAlpha(153), fontSize: 12)),
+                  Text(subtitle,
+                      style: TextStyle(
+                          color: Colors.white.withAlpha(153), fontSize: 12)),
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios, color: Colors.white.withAlpha(128), size: 13),
+            Icon(Icons.arrow_forward_ios,
+                color: Colors.white.withAlpha(128), size: 13),
           ],
         ),
       ),

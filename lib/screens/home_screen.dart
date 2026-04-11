@@ -22,7 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     // Background music starts here (looped)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _audioService.forcePlayMenuMusic();
+      _audioService.playMenuMusic();
     });
   }
 

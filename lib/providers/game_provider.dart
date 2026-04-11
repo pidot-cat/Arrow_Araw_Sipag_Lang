@@ -1,5 +1,8 @@
 // lib/providers/game_provider.dart
-// Manages game stats, level state, and audio — shared across all screens.
+// FIX Bug 2: Added stopLevel() — call this before Navigator.pop() to prevent
+// the timer from firing playLoseSound() after the screen is gone.
+// Each level screen's LevelStateMixin manages its OWN timer. GameProvider's
+// timer is only used by the legacy GameScreen (kept for compatibility).
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -46,36 +49,18 @@ class GameProvider with ChangeNotifier {
   }
 
   Future<void> _loadStats() async {
-    // Always read local prefs first — these are written synchronously before
-    // any async Supabase call, so they are always up-to-date.
     final prefs = await SharedPreferences.getInstance();
-    final localStats = GameStatsModel(
+    _stats = GameStatsModel(
       totalWins: prefs.getInt(AppConstants.keyTotalWins) ?? 0,
       totalLosses: prefs.getInt(AppConstants.keyTotalLosses) ?? 0,
       totalMatches: prefs.getInt(AppConstants.keyTotalMatches) ?? 0,
       totalDays: prefs.getInt(AppConstants.keyTotalDays) ?? 1,
     );
-    _stats = localStats;
     notifyListeners();
     try {
       final remoteStats = await SupabaseService.fetchGameStats();
       if (remoteStats != null) {
-        // Merge: take the maximum value for each field to avoid overwriting
-        // local increments that haven't been flushed to Supabase yet.
-        _stats = GameStatsModel(
-          totalWins: remoteStats.totalWins > localStats.totalWins
-              ? remoteStats.totalWins
-              : localStats.totalWins,
-          totalLosses: remoteStats.totalLosses > localStats.totalLosses
-              ? remoteStats.totalLosses
-              : localStats.totalLosses,
-          totalMatches: remoteStats.totalMatches > localStats.totalMatches
-              ? remoteStats.totalMatches
-              : localStats.totalMatches,
-          totalDays: remoteStats.totalDays > localStats.totalDays
-              ? remoteStats.totalDays
-              : localStats.totalDays,
-        );
+        _stats = remoteStats;
         await _saveLocalStats();
         notifyListeners();
       }
@@ -226,18 +211,22 @@ class GameProvider with ChangeNotifier {
     }
   }
 
-  // refreshStats reads local prefs only — these are always up-to-date because
-  // _saveLocalStats() is called first before any async Supabase write.
-  Future<void> refreshStats() async {
-    final prefs = await SharedPreferences.getInstance();
-    _stats = GameStatsModel(
-      totalWins: prefs.getInt(AppConstants.keyTotalWins) ?? 0,
-      totalLosses: prefs.getInt(AppConstants.keyTotalLosses) ?? 0,
-      totalMatches: prefs.getInt(AppConstants.keyTotalMatches) ?? 0,
-      totalDays: prefs.getInt(AppConstants.keyTotalDays) ?? 1,
-    );
+  /// Clears all stats locally and in Supabase. Called on account deletion.
+  /// Saves zeroed stats so any re-registration sees clean history.
+  Future<void> resetStats() async {
+    _stats = GameStatsModel();
+    await _saveLocalStats();
+    // Also zero-out the remote record so re-registration starts fresh
+    try {
+      await SupabaseService.saveGameStats(_stats);
+    } catch (e) {
+      debugPrint('resetStats remote error (non-fatal): $e');
+    }
     notifyListeners();
   }
+
+  // Refreshes stats from Supabase (updates local cache too).
+  Future<void> refreshStats() async => await _loadStats();
 
   void nextLevel() {
     if (_currentLevel < 10) initLevel(_currentLevel + 1);
@@ -249,18 +238,11 @@ class GameProvider with ChangeNotifier {
   void playGameMusic() => _audioService.playGameMusic();
   void resumeMenuMusic() => _audioService.resumeMenuMusic();
 
-  // Called by LevelStateMixin after victory — saves stats only (audio handled by level).
   void recordLevelComplete(
       {required int level, required int time, required int lives}) {
     _stats.addWin();
     _saveStats();
-    notifyListeners();
-  }
-
-  // Called by LevelStateMixin after game over — saves loss stats only (audio handled by level).
-  void recordLevelLoss() {
-    _stats.addLoss();
-    _saveStats();
+    _audioService.playWinSound();
     notifyListeners();
   }
 

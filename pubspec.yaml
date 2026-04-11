@@ -22,6 +22,9 @@ dependencies:
   # Icons
   cupertino_icons: ^1.0.2
 
+  # HTTP client for EmailJS REST API calls (ContactScreen)
+  http: ^1.2.0
+
   # Audio
   audioplayers: ^6.6.0
 

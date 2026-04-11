@@ -1,3 +1,8 @@
+// records_screen.dart
+// Shows player game statistics pulled from Supabase (with local SharedPrefs cache).
+// Fixed layout: no scroll, all content fits on one screen, logo enlarged to 200px,
+// faint duplicate logo at bottom removed.
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/background_wrapper.dart';
@@ -16,6 +21,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
   @override
   void initState() {
     super.initState();
+    // Pull fresh stats from Supabase after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<GameProvider>().refreshStats();
     });
@@ -23,99 +29,94 @@ class _RecordsScreenState extends State<RecordsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
     return Scaffold(
       body: BackgroundWrapper(
         showBackButton: true,
         child: Consumer<GameProvider>(
           builder: (context, gameProvider, child) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 12),
-                    Image.asset(AppConstants.logoWithBg, width: 90, height: 90),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Records',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                      ),
+            // Fixed layout — no scrolling
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                children: [
+                  SizedBox(height: size.height * 0.04),
+
+                  // Logo — enlarged to 200px to match other screens
+                  Image.asset(AppConstants.logoWithBg, width: 200, height: 200),
+                  const SizedBox(height: 12),
+
+                  // Screen title
+                  const Text(
+                    'Records',
+                    style: TextStyle(
+                      color: Colors.white, fontSize: 26,
+                      fontWeight: FontWeight.bold, letterSpacing: 1.2,
                     ),
-                    const SizedBox(height: 16),
-                    _buildStatCard('Total Wins',
-                        gameProvider.stats.totalWins.toString(),
-                        Colors.greenAccent, Icons.emoji_events_rounded),
-                    const SizedBox(height: 10),
-                    _buildStatCard('Total Losses',
-                        gameProvider.stats.totalLosses.toString(),
-                        Colors.redAccent, Icons.close_rounded),
-                    const SizedBox(height: 10),
-                    _buildStatCard('Total Matches',
-                        gameProvider.stats.totalMatches.toString(),
-                        Colors.cyanAccent, Icons.sports_esports_rounded),
-                    const SizedBox(height: 10),
-                    _buildStatCard('Total Days',
-                        gameProvider.stats.totalDays.toString(),
-                        Colors.orangeAccent, Icons.calendar_today_rounded),
-                    const SizedBox(height: 10),
-                    // Win Rate card
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 16),
-                      decoration: BoxDecoration(
-                        gradient: AppColors.primaryGradient,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.cyan.withAlpha(60),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withAlpha(26),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.bar_chart_rounded,
-                                    color: Colors.white, size: 22),
-                              ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'Win Rate',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            '${gameProvider.stats.winRate.toStringAsFixed(1)}%',
-                            style: const TextStyle(
-                              color: Colors.greenAccent,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: size.height * 0.025),
+
+                  // Individual stat cards
+                  _buildStatCard(context, 'Total Wins',
+                      gameProvider.stats.totalWins.toString(),
+                      Colors.greenAccent, Icons.emoji_events_rounded),
+                  const SizedBox(height: 12),
+                  _buildStatCard(context, 'Total Losses',
+                      gameProvider.stats.totalLosses.toString(),
+                      Colors.redAccent, Icons.close_rounded),
+                  const SizedBox(height: 12),
+                  _buildStatCard(context, 'Total Matches',
+                      gameProvider.stats.totalMatches.toString(),
+                      Colors.cyanAccent, Icons.sports_esports_rounded),
+                  const SizedBox(height: 12),
+                  _buildStatCard(context, 'Total Days',
+                      gameProvider.stats.totalDays.toString(),
+                      Colors.orangeAccent, Icons.calendar_today_rounded),
+                  const SizedBox(height: 16),
+
+                  // Win rate gradient card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(color: Colors.cyan.withAlpha(60),
+                            blurRadius: 12, offset: const Offset(0, 4)),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withAlpha(26),
+                              borderRadius: BorderRadius.circular(10),
                             ),
+                            child: const Icon(Icons.bar_chart_rounded,
+                                color: Colors.white, size: 26),
                           ),
-                        ],
-                      ),
+                          const SizedBox(width: 14),
+                          const Text('Win Rate',
+                              style: TextStyle(color: Colors.white,
+                                  fontSize: 18, fontWeight: FontWeight.bold)),
+                        ]),
+                        // Win rate percentage value
+                        Text(
+                          '${gameProvider.stats.winRate.toStringAsFixed(1)}%',
+                          style: const TextStyle(color: Colors.greenAccent,
+                              fontSize: 28, fontWeight: FontWeight.bold),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  // No bottom logo, no extra spacing that forces scroll
+                ],
               ),
             );
           },
@@ -124,52 +125,34 @@ class _RecordsScreenState extends State<RecordsScreen> {
     );
   }
 
-  Widget _buildStatCard(
-      String label, String value, Color color, IconData icon) {
+  /// Single stat row card with icon, label, and bold value.
+  Widget _buildStatCard(BuildContext context, String label, String value,
+      Color color, IconData icon) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withAlpha(80), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: color.withAlpha(50),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: color.withAlpha(60),
+            blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withAlpha(51),
-              borderRadius: BorderRadius.circular(10),
+              color: color.withAlpha(51), borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color, size: 22),
+            child: Icon(icon, color: color, size: 26),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          const SizedBox(width: 18),
+          Expanded(child: Text(label,
+              style: const TextStyle(color: Colors.white, fontSize: 17,
+                  fontWeight: FontWeight.w600))),
+          Text(value, style: TextStyle(color: color, fontSize: 28,
+              fontWeight: FontWeight.bold)),
         ],
       ),
     );

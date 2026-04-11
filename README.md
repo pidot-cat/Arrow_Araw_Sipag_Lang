@@ -10,20 +10,22 @@ A vibrant arrow puzzle escape mobile game built with Flutter.
 - Sign Up Screen - New user registration with OTP email verification.
 - Forgot Password Screen - 3-step account recovery via OTP email verification.
 - Home Screen - The main navigation hub with Welcome message.
-- Level Select Screen - Dynamic map featuring 10+ difficulty tiers.
+- Level Select Screen - Dynamic map featuring 10 difficulty tiers.
 
 #### 🎮 Game Levels
 
-- Game Screen Level 1 - 5x5 grid shape Heart.
-- Game Screen Level 2 - 6x6 grid shape Circle.
-- Game Screen Level 3 - 7x7 grid shape Triangle.
-- Game Screen Level 4 - 8x8 grid shape Square.
-- Game Screen Level 5 - 9x9 grid shape Pentagon.
-- Game Screen Level 6 - 10x10 grid shape Hexagon.
-- Game Screen Level 7 - 11x11 grid shape Heptagon.
-- Game Screen Level 8 - 12x12 grid shape Octagon.
-- Game Screen Level 9 - 13x13 grid shape Nonagon.
-- Game Screen Level 10 - 14x14 grid shape Decagon.
+| Level | Grid  | Shape    | Arrows | Bent Style |
+|-------|-------|----------|--------|------------|
+| 1     | 5×5   | Heart    | ~13    | Straight & L-bent |
+| 2     | 6×6   | Circle   | ~20    | Straight & L-bent |
+| 3     | 7×7   | Triangle | ~25    | Straight & L-bent |
+| 4     | 8×8   | Square   | ~30    | Straight & L-bent |
+| 5     | 9×9   | Pentagon | ~38    | Straight & L-bent |
+| 6     | 10×10 | Hexagon  | ~45    | Straight & L-bent |
+| 7     | 11×11 | Heptagon | ~55    | Straight & L-bent |
+| 8     | 12×12 | Shield   | 62     | Straight & L-bent |
+| 9     | 13×13 | Nonagon  | ~70    | Straight & L-bent |
+| 10    | 14×14 | Cross    | 66     | Straight & L-bent |
 
 #### ⚙️ Other Screens
 
@@ -36,11 +38,22 @@ A vibrant arrow puzzle escape mobile game built with Flutter.
 
 ## 🎯 Core Gameplay Mechanics
 
-- Supabase Integration – Real-time database for user records and cloud-based authentication.
-- OTP Email Verification – 6-digit code sent to email for Sign Up and Forgot Password flows.
-- Immersive Audio – Menu music and in-game sound effects using audioplayers.
-- Advanced Animations – Smooth UI transitions and pulsing effects via flutter_animate.
-- Statistics Tracking – Automated tracking of Wins, Losses, and Matches.
+- **Bent Arrow Puzzle** – Each arrow follows an L-shaped or straight path through the grid. Tap arrows in the correct order to slide them off the board.
+- **Solve Order** – Arrows are numbered 0→N and must be cleared in sequence. Tapping the wrong one costs a life.
+- **Escape Direction** – Each arrow has an `escape` direction (up/down/left/right). It can only slide out if its path is unblocked by remaining arrows.
+- **Lives System** – 3 lives per level. Wrong taps or time expiry end the game.
+- **60-Second Timer** – Complete every level within 60 seconds.
+- **Supabase Integration** – Real-time database for user records and cloud-based authentication.
+- **OTP Email Verification** – 6-digit code sent to email for Sign Up and Forgot Password flows.
+- **Immersive Audio** – Menu music and in-game sound effects using audioplayers.
+- **Advanced Animations** – Smooth slide-out animations and UI transitions via flutter_animate.
+- **Statistics Tracking** – Automated tracking of Wins, Losses, and Matches.
+
+## 🖼️ Visual Design Notes
+
+- **Grid cells** only display a background highlight on cells that currently have an unsolved arrow — empty cells render transparently, keeping the grid clean.
+- **Arrow shafts** render as smooth L-bends (right-angle turns) when connecting two cells that differ in both row and column, using the painter's horizontal-first L-bend logic.
+- **No tail dot** — single-point arrows skip the dot fallback; all arrows render shaft + arrowhead only.
 
 ## 🔐 Authentication Flow
 
@@ -60,6 +73,7 @@ A vibrant arrow puzzle escape mobile game built with Flutter.
 ```text
 lib/
 ├── levels/
+│   ├── level_base.dart          ← Shared painter, mixins, arrow models
 │   ├── game_screen_lvl_1.dart
 │   ├── game_screen_lvl_2.dart
 │   ├── game_screen_lvl_3.dart
@@ -67,9 +81,9 @@ lib/
 │   ├── game_screen_lvl_5.dart
 │   ├── game_screen_lvl_6.dart
 │   ├── game_screen_lvl_7.dart
-│   ├── game_screen_lvl_8.dart
+│   ├── game_screen_lvl_8.dart   ← Shield shape, 12×12, 62 arrows
 │   ├── game_screen_lvl_9.dart
-│   └── game_screen_lvl_10.dart
+│   └── game_screen_lvl_10.dart  ← Cross shape, 14×14, 66 arrows
 ├── models/
 │   ├── arrow_model.dart
 │   └── game_stats_model.dart
@@ -106,6 +120,28 @@ lib/
 └── main.dart
 ```
 
+## 🏗️ Architecture & Logic
+
+### Arrow Data Models
+- **`ArrowData`** — Legacy straight-line arrows (used by earlier levels).
+- **`BentArrowData`** — Multi-segment bent arrows. Each arrow holds an ordered list of `BentCell` grid positions and an `escape` direction.
+
+### Painter Logic (`BentArrowPainter`)
+- Draws the arrow shaft as a polyline through cell centers.
+- **L-bend rendering**: When consecutive cells differ in both row and column, the painter inserts a right-angle corner (horizontal-first) instead of a diagonal line.
+- No tail dot — single-point fallback removed for a clean look.
+
+### Grid Rendering
+- Cell backgrounds are drawn **only** on cells occupied by an unsolved arrow.
+- As arrows are cleared, their cells fade out of the grid automatically.
+
+### State Management
+The app uses the Provider Pattern. `GameProvider` handles grid state and statistics; `AuthProvider` manages Supabase authentication.
+
+### Data Persistence
+- **Cloud**: High scores and profiles stored in Supabase.
+- **Local**: SharedPreferences for fast local session handling.
+
 ## 🛠️ Technology Stack
 
 - Framework: Flutter (Dart)
@@ -115,15 +151,6 @@ lib/
 - Audio: Audioplayers
 - Design: Figma & Canva
 
-## 🏗️ Architecture & Logic
-
-### State Management
-The app utilizes the Provider Pattern to separate business logic from the UI. GameProvider handles the grid state and statistics, while AuthProvider manages the secure connection to Supabase.
-
-### Data Persistence
-- Cloud Storage: High scores and profiles are stored in Supabase.
-- Local Storage: SharedPreferences is used for fast local session handling.
-
 ## 👨‍💻 About the Developer
 
-Developed by a student of Urdaneta City University. This project is a practical application of advanced mobile development, emphasizing the philosophy: Sipag Lang (Hard Work Only).
+Developed by a student of Urdaneta City University. This project is a practical application of advanced mobile development, emphasizing the philosophy: **Sipag Lang** (Hard Work Only).

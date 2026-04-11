@@ -19,19 +19,19 @@ const Set<(int, int)> _shapeCells = {
 };
 
 List<BentArrowData> _buildArrows() => [
-  BentArrowData(id:0,  segs:[BentCell(0,1)],              escape:ArrowDir.up,    color:AppColors.arrowRed),
-  BentArrowData(id:1,  segs:[BentCell(0,2)],              escape:ArrowDir.up,    color:AppColors.arrowOrange),
-  BentArrowData(id:2,  segs:[BentCell(0,3)],              escape:ArrowDir.up,    color:AppColors.arrowYellow),
-  BentArrowData(id:3,  segs:[BentCell(1,0)],              escape:ArrowDir.left,  color:AppColors.arrowGreen),
-  BentArrowData(id:4,  segs:[BentCell(1,1)],              escape:ArrowDir.left,  color:AppColors.arrowCyan),
-  BentArrowData(id:5,  segs:[BentCell(1,3)],              escape:ArrowDir.right, color:AppColors.arrowBlue),
-  BentArrowData(id:6,  segs:[BentCell(1,4)],              escape:ArrowDir.right, color:AppColors.arrowPurple),
-  BentArrowData(id:7,  segs:[BentCell(2,0)],              escape:ArrowDir.left,  color:AppColors.arrowPink),
-  BentArrowData(id:8,  segs:[BentCell(2,4)],              escape:ArrowDir.right, color:AppColors.arrowRed),
-  BentArrowData(id:9,  segs:[BentCell(3,1)],              escape:ArrowDir.left,  color:AppColors.arrowOrange),
-  BentArrowData(id:10, segs:[BentCell(3,3)],              escape:ArrowDir.right, color:AppColors.arrowYellow),
-  BentArrowData(id:11, segs:[BentCell(1,2),BentCell(2,2)],escape:ArrowDir.up,    color:AppColors.arrowGreen),
-  BentArrowData(id:12, segs:[BentCell(4,2),BentCell(3,2)],escape:ArrowDir.down,  color:AppColors.arrowCyan),
+  BentArrowData(id:0,  segs:[const BentCell(0,1)], escape:ArrowDir.up,    color:AppColors.arrowRed),
+  BentArrowData(id:1,  segs:[const BentCell(0,2)], escape:ArrowDir.up,    color:AppColors.arrowOrange),
+  BentArrowData(id:2,  segs:[const BentCell(0,3)], escape:ArrowDir.up,    color:AppColors.arrowYellow),
+  BentArrowData(id:3,  segs:[const BentCell(1,0)], escape:ArrowDir.left,  color:AppColors.arrowGreen),
+  BentArrowData(id:4,  segs:[const BentCell(1,1)], escape:ArrowDir.left,  color:AppColors.arrowCyan),
+  BentArrowData(id:5,  segs:[const BentCell(1,3)], escape:ArrowDir.right, color:AppColors.arrowBlue),
+  BentArrowData(id:6,  segs:[const BentCell(1,4)], escape:ArrowDir.right, color:AppColors.arrowPurple),
+  BentArrowData(id:7,  segs:[const BentCell(2,0)], escape:ArrowDir.left,  color:AppColors.arrowPink),
+  BentArrowData(id:8,  segs:[const BentCell(2,4)], escape:ArrowDir.right, color:AppColors.arrowRed),
+  BentArrowData(id:9,  segs:[const BentCell(3,1)], escape:ArrowDir.left,  color:AppColors.arrowOrange),
+  BentArrowData(id:10, segs:[const BentCell(3,3)], escape:ArrowDir.right, color:AppColors.arrowYellow),
+  BentArrowData(id:11, segs:[const BentCell(1,2), const BentCell(2,2)], escape:ArrowDir.up, color:AppColors.arrowGreen),
+  BentArrowData(id:12, segs:[const BentCell(4,2), const BentCell(3,2)], escape:ArrowDir.down, color:AppColors.arrowCyan),
 ];
 
 class GameScreenLvl1 extends StatefulWidget {

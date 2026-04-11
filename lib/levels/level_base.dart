@@ -456,13 +456,9 @@ class BentArrowPainter extends CustomPainter {
     _drawPolyline(canvas, pts, shaftPaint, Offset.zero);
 
     // ── Draw shaft border ────────────────────────────────────────────────────
-    final borderPaint = Paint()
-      ..color = Colors.white30
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = shaft * 2 + 2
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    // draw border behind — already drawn, skip (shadow covers it)
+    // Border paint omitted — shadow covers it; kept as reference below if needed:
+    // Paint()..color = Colors.white30..style = PaintingStyle.stroke
+    //   ..strokeWidth = shaft * 2 + 2..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round;
 
     // ── Draw arrowhead ───────────────────────────────────────────────────────
     _drawHead(canvas, pts.last, tip, headLen, headWidth, color);

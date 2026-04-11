@@ -106,6 +106,7 @@ class SettingsScreen extends StatelessWidget {
                         Provider.of<AuthProvider>(context, listen: false);
                     final gameProvider =
                         Provider.of<GameProvider>(context, listen: false);
+                    final navigator = Navigator.of(context);
 
                     final result = await authProvider.deleteAccount(pass);
                     if (!ctx.mounted) return;
@@ -115,10 +116,7 @@ class SettingsScreen extends StatelessWidget {
                       await gameProvider.resetStats();
                       Navigator.pop(ctx);
                       AudioService().stopAll();
-                      if (context.mounted) {
-                        Navigator.pushNamedAndRemoveUntil(
-                            context, '/login', (r) => false);
-                      }
+                      navigator.pushNamedAndRemoveUntil('/login', (r) => false);
                     } else {
                       setDialogState(() { isLoading = false; errorMsg = result; });
                     }

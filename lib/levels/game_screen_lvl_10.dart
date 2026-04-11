@@ -7,6 +7,7 @@ import '../utils/app_colors.dart';
 import '../widgets/game_over_overlay.dart';
 import '../widgets/victory_overlay.dart';
 import 'level_base.dart';
+import 'game_screen_lvl_1.dart';
 
 
 const int _rows = 14, _cols = 14;

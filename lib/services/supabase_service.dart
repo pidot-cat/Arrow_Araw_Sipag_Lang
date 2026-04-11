@@ -126,12 +126,9 @@ class SupabaseService {
       // if the signUp call succeeds, the username is guaranteed to exist.
       data: {'username': username},
 
-      // KEY FIX — tells Supabase this is an OTP flow, not a magic-link flow.
-      // Replace 'io.supabase.arrowaraw' with your actual app bundle ID scheme
-      // if you change the package name. This must also be listed in:
-      //   Supabase Dashboard → Auth → URL Configuration → Redirect URLs
-      // Format: '<your-scheme>://login-callback/'
-      emailRedirectTo: 'io.supabase.arrowaraw://login-callback/',
+      // No emailRedirectTo parameter is needed for a pure 6-digit OTP flow.
+      // Supabase will automatically send an OTP if the "Confirm email"
+      // setting is ON and your email template contains the {{ .Token }} variable.
     );
   }
 

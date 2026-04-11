@@ -461,13 +461,8 @@ class BentArrowPainter extends CustomPainter {
     _drawPolyline(canvas, pts, shaftPaint, Offset.zero);
 
     // ── Draw shaft border ────────────────────────────────────────────────────
-    final borderPaint = Paint()
-      ..color = Colors.white30
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = shaft * 2 + 2
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    // draw border behind — already drawn, skip (shadow covers it)
+    // Border paint removed — shadow covers it, so it is not drawn.
+    // The variable was previously declared but never used (lint: unused_local_variable).
 
     // ── Draw arrowhead ───────────────────────────────────────────────────────
     _drawHead(canvas, pts.last, tip, headLen, headWidth, color);

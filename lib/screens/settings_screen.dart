@@ -103,9 +103,9 @@ class SettingsScreen extends StatelessWidget {
                     setDialogState(() { isLoading = true; errorMsg = null; });
 
                     final authProvider =
-                        Provider.of<AuthProvider>(context, listen: false);
+                        Provider.of<AuthProvider>(ctx, listen: false);
                     final gameProvider =
-                        Provider.of<GameProvider>(context, listen: false);
+                        Provider.of<GameProvider>(ctx, listen: false);
 
                     // 1. Wipe remote + local stats FIRST while session is still valid
                     await gameProvider.resetStats();

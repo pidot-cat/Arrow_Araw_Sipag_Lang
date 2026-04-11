@@ -230,6 +230,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
       // Sign out the temporary recovery session and return to Login
       await authProvider.logout();
+      // mounted check required after every await — context may be invalid
+      // if the widget was disposed while logout() was running.
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/login');
     } else {
       _showSnack('Failed to update password: $result', type: _SnackType.error);

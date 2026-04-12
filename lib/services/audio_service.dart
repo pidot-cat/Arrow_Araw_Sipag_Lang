@@ -1,60 +1,86 @@
 // lib/services/audio_service.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// Arrow Araw — AudioService v4  (FIXED: Asset Paths + State Machine)
+// Arrow Araw — AudioService v5  (FINAL RECTIFICATION)
 //
-// [FIX 3] ASSET PATH CORRECTION
-//   OLD: AssetSource('audio/Lobby-Music.mp3')
-//        pubspec.yaml declared: assets/sounds/
-//        Physical files lived in: assets/sounds/
-//   → All three were inconsistent. audioplayers' AssetSource resolves relative
-//     to the assets/ root declared in pubspec.yaml. If pubspec declares
-//     assets/sounds/ but code says audio/, the file is not found → silence.
+// [FIX A] IDLE MUSIC RESUME — startIdleResumeTimer() restarts a 2-second
+//         countdown on every tap. If the player is idle for 2 s while
+//         in-game music state is 'game', _musicPlayer.resume() is called.
 //
-//   NEW: pubspec.yaml now declares: assets/audio/
-//        Files have been moved to:  assets/audio/
-//        Code uses AssetSource('audio/Lobby-Music.mp3')  ← all consistent ✓
+// [FIX B] APP LIFECYCLE HARD STOP — WidgetsBindingObserver stops ALL audio
+//         (music + SFX) when the app is paused, detached, or hidden.
+//         Call attachLifecycleObserver() once from main().
 //
-// MUSIC ROUTING
-// ─────────────
-//   Lobby-Music.mp3  ← loops on: Home, Records, Settings, Contact,
-//                       Terms, Privacy, About. NO restart between these screens.
-//   Ingame-Music.mp3 ← loops ONLY during active gameplay.
-//
-// SFX ROUTING
-// ────────────
-//   Arrow-Sound.mp3      → playArrowSound()      ← on successful release
-//   Wrong Move-Sound.mp3 → playWrongSound()       ← on blocked move
-//   Win-Sound.mp3        → playWinSound()         ← ONLY when Victory overlay mounts
-//   Lose-Sound.mp3       → playGameOverSound()    ← ONLY when GameOver overlay mounts
-//
-// STATE MACHINE  '' | 'menu' | 'game' | 'win' | 'lose'
+// [FIX C] MUSIC NEVER CUTS ON TAP — SFX players are separate from
+//         _musicPlayer, so arrow/wrong sounds never interrupt the music.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/widgets.dart';
 
-class AudioService {
+class AudioService with WidgetsBindingObserver {
   // ── Singleton ──────────────────────────────────────────────────────────────
   static final AudioService _instance = AudioService._internal();
   factory AudioService() => _instance;
   AudioService._internal();
 
   // ── Players ────────────────────────────────────────────────────────────────
-  final AudioPlayer _musicPlayer = AudioPlayer(); // music (lobby / ingame)
-  final AudioPlayer _sfxPlayer   = AudioPlayer(); // arrow, win, lose sfx
-  final AudioPlayer _wrongPlayer = AudioPlayer(); // dedicated wrong-move channel
+  final AudioPlayer _musicPlayer = AudioPlayer();
+  final AudioPlayer _sfxPlayer   = AudioPlayer();
+  final AudioPlayer _wrongPlayer = AudioPlayer();
 
-  // ── Toggle state ───────────────────────────────────────────────────────────
+  // ── Settings ───────────────────────────────────────────────────────────────
   bool _isMusicOn = true;
   bool _isSfxOn   = true;
-
   bool get isMusicOn => _isMusicOn;
   bool get isSfxOn   => _isSfxOn;
 
-  // ── Music state  '' | 'menu' | 'game' | 'win' | 'lose' ───────────────────
+  // ── State: '' | 'menu' | 'game' | 'win' | 'lose' ─────────────────────────
   String _currentMusic = '';
 
-  // ── Toggle controls ────────────────────────────────────────────────────────
+  // ── [FIX A] Idle resume timer ──────────────────────────────────────────────
+  Timer? _idleTimer;
 
+  /// Call on every player tap (correct, wrong, or miss) to reset the 2s timer.
+  void startIdleResumeTimer() {
+    _idleTimer?.cancel();
+    _idleTimer = Timer(const Duration(seconds: 2), _resumeIfGame);
+  }
+
+  /// Stop and discard the idle timer (game-over, victory, quit, dispose).
+  void cancelIdleTimer() {
+    _idleTimer?.cancel();
+    _idleTimer = null;
+  }
+
+  Future<void> _resumeIfGame() async {
+    if (_currentMusic != 'game' || !_isMusicOn) return;
+    await _musicPlayer.resume();
+  }
+
+  // ── [FIX B] AppLifecycle hard stop ────────────────────────────────────────
+  bool _observerAttached = false;
+
+  /// Register once from main() to enable background audio hard-stop.
+  void attachLifecycleObserver() {
+    if (_observerAttached) return;
+    _observerAttached = true;
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused   ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      stopAll(); // Hard stop — no ghost audio in background
+    }
+    if (state == AppLifecycleState.resumed) {
+      if (_currentMusic == 'menu' && _isMusicOn) _musicPlayer.resume();
+    }
+  }
+
+  // ── Toggle controls ────────────────────────────────────────────────────────
   Future<void> toggleMusic() async {
     _isMusicOn = !_isMusicOn;
     if (!_isMusicOn) {
@@ -69,12 +95,6 @@ class AudioService {
   void toggleSfx() => _isSfxOn = !_isSfxOn;
 
   // ── Music playback ─────────────────────────────────────────────────────────
-  //
-  // [FIX 3] All asset paths now use the 'audio/' prefix which matches the
-  // pubspec.yaml declaration of 'assets/audio/'. audioplayers resolves
-  // AssetSource(path) as assets/<path>, so 'audio/Lobby-Music.mp3' →
-  // 'assets/audio/Lobby-Music.mp3' — exactly where the file lives.
-
   Future<void> playMenuMusic() async {
     if (_currentMusic == 'menu') return;
     _currentMusic = 'menu';
@@ -98,8 +118,7 @@ class AudioService {
     await playMenuMusic();
   }
 
-  // ── SFX ────────────────────────────────────────────────────────────────────
-
+  // ── SFX — [FIX C] never touch _musicPlayer ────────────────────────────────
   Future<void> playArrowSound() async {
     if (!_isSfxOn) return;
     await _sfxPlayer.stop();
@@ -114,6 +133,7 @@ class AudioService {
 
   Future<void> playWinSound() async {
     _currentMusic = 'win';
+    cancelIdleTimer();
     await _musicPlayer.stop();
     if (!_isSfxOn) return;
     await _sfxPlayer.stop();
@@ -122,6 +142,7 @@ class AudioService {
 
   Future<void> playGameOverSound() async {
     _currentMusic = 'lose';
+    cancelIdleTimer();
     await _musicPlayer.stop();
     if (!_isSfxOn) return;
     await _sfxPlayer.stop();
@@ -129,8 +150,8 @@ class AudioService {
   }
 
   // ── Utility ────────────────────────────────────────────────────────────────
-
   Future<void> stopAll() async {
+    cancelIdleTimer();
     await _musicPlayer.stop();
     await _sfxPlayer.stop();
     await _wrongPlayer.stop();
@@ -138,10 +159,8 @@ class AudioService {
   }
 
   // ── Legacy shims ───────────────────────────────────────────────────────────
-
-  Future<void> playLoseSound() async => playGameOverSound();
-
-  Future<void> stopGameMusic() async {
+  Future<void> playLoseSound()  async => playGameOverSound();
+  Future<void> stopGameMusic()  async {
     await _musicPlayer.stop();
     await Future.delayed(const Duration(milliseconds: 150));
     await resumeMenuMusic();

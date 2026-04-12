@@ -37,10 +37,11 @@ class AppConstants {
   static const String victory = 'assets/images/Victory.png';
   // ✅ FIXED: Removed backButton asset constant — walang file, ginagamit na built-in icon
 
-  // Asset Paths — Sounds
-  static const String soundArrow = 'assets/sounds/Arrow-Sound.mp3';
-  static const String soundFirstMusic = 'assets/sounds/First-Music.mp3';
-  static const String soundSecondMusic = 'assets/sounds/Second-Music.mp3';
-  static const String soundWin = 'assets/sounds/Win-Sound.mp3';
-  static const String soundLose = 'assets/sounds/Lose-Sound.mp3';
+  // Asset Paths — Audio (all files live in assets/audio/)
+  static const String soundArrow = 'assets/audio/Arrow-Sound.mp3';
+  static const String soundLobbyMusic = 'assets/audio/Lobby-Music.mp3';
+  static const String soundIngameMusic = 'assets/audio/Ingame-Music.mp3';
+  static const String soundWin = 'assets/audio/Win-Sound.mp3';
+  static const String soundLose = 'assets/audio/Lose-Sound.mp3';
+  static const String soundWrongMove = 'assets/audio/Wrong Move-Sound.mp3';
 }

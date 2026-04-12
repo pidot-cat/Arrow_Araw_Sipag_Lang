@@ -14,18 +14,18 @@ A vibrant arrow puzzle escape mobile game built with Flutter.
 
 #### 🎮 Game Levels
 
-| Level | Grid  | Shape    | Arrows | Difficulty |
-|-------|-------|----------|--------|------------|
-| 1     | 5×5   | Heart    |   13   | Easy       |
-| 2     | 6×6   | Circle   |   20   | Easy       |
-| 3     | 7×7   | Triangle |   25   | Normal     |
-| 4     | 8×8   | Square   |   30   | Normal     |
-| 5     | 9×9   | Pentagon |   38   | Hard       |
-| 6     | 10×10 | Hexagon  |   45   | Hard       |
-| 7     | 11×11 | Heptagon |   55   | Expert     |
-| 8     | 12×12 | Shield   |   62   | Expert     |
-| 9     | 13×13 | Nonagon  |   70   | Master     |
-| 10    | 14×14 | Cross    |   66   | Master     |
+| Level | Grid  |  Shape  | Arrows | Difficulty |
+|-------|-------|---------|--------|------------|
+| 1     | 5×5   |  Square |   12   | Easy       |
+| 2     | 6×6   |  Square |   24   | Easy       |
+| 3     | 7×7   |  Square |   36   | Normal     |
+| 4     | 8×8   |  Square |   48   | Normal     |
+| 5     | 9×9   |  Square |   60   | Hard       |
+| 6     | 10×10 |  Square |   72   | Hard       |
+| 7     | 11×11 |  Square |   84   | Expert     |
+| 8     | 12×12 |  Square |   96   | Expert     |
+| 9     | 13×13 |  Square |   108  | Master     |
+| 10    | 14×14 |  Square |   120  | Master     |
 
 #### ⚙️ Other Screens
 
@@ -118,40 +118,40 @@ All stat rows are compact (**max-height: 60dp**) with reduced padding for a prof
 lib/
 ├── levels/
 │   ├── level_base.dart          ← Shared painter, mixins, HUD, arrow models
-│   ├── game_screen_lvl_1.dart   ← Heart    5×5  13 arrows
-│   ├── game_screen_lvl_2.dart   ← Circle   6×6  20 arrows
-│   ├── game_screen_lvl_3.dart   ← Triangle 7×7  25 arrows
-│   ├── game_screen_lvl_4.dart   ← Square   8×8  30 arrows
-│   ├── game_screen_lvl_5.dart   ← Pentagon 9×9  38 arrows
-│   ├── game_screen_lvl_6.dart   ← Hexagon  10×10 45 arrows
-│   ├── game_screen_lvl_7.dart   ← Heptagon 11×11 55 arrows
-│   ├── game_screen_lvl_8.dart   ← Shield   12×12 62 arrows
-│   ├── game_screen_lvl_9.dart   ← Nonagon  13×13 70 arrows
-│   └── game_screen_lvl_10.dart  ← Cross    14×14 66 arrows
+│   ├── game_screen_lvl_1.dart   
+│   ├── game_screen_lvl_2.dart   
+│   ├── game_screen_lvl_3.dart   
+│   ├── game_screen_lvl_4.dart   
+│   ├── game_screen_lvl_5.dart   
+│   ├── game_screen_lvl_6.dart   
+│   ├── game_screen_lvl_7.dart  
+│   ├── game_screen_lvl_8.dart   
+│   ├── game_screen_lvl_9.dart   
+│   └── game_screen_lvl_10.dart  
 ├── models/
 │   ├── arrow_model.dart
 │   └── game_stats_model.dart
 ├── providers/
 │   ├── auth_provider.dart
-│   └── game_provider.dart       ← Added recordLevelLoss()
+│   └── game_provider.dart       
 ├── screens/
 │   ├── about_screen.dart
-│   ├── contact_screen.dart      ← EmailJS → arrowarawsipaglang@gmail.com
+│   ├── contact_screen.dart      
 │   ├── forgot_password_screen.dart
 │   ├── game_screen.dart
 │   ├── home_screen.dart
-│   ├── level_select_screen.dart ← Lock/unlock animations
+│   ├── level_select_screen.dart 
 │   ├── login_screen.dart
 │   ├── policy_screen.dart
-│   ├── records_screen.dart      ← Compact 60dp rows, accurate stats
-│   ├── settings_screen.dart     ← Audio modal (Music + SFX toggles)
+│   ├── records_screen.dart      
+│   ├── settings_screen.dart     
 │   ├── signup_screen.dart
 │   ├── splash_screen.dart
 │   └── terms_screen.dart
 ├── services/
-│   ├── audio_service.dart       ← Fixed music paths, playWrongSound(), playGameOverSound()
-│   ├── level_unlock_service.dart ← Added unlockAll() for master unlock
-│   └── supabase_service.dart    ← Hard delete via delete_user RPC
+│   ├── audio_service.dart      
+│   ├── level_unlock_service.dart
+│   └── supabase_service.dart    
 ├── utils/
 │   ├── app_colors.dart
 │   └── constants.dart
@@ -173,12 +173,12 @@ assets/
 │   ├── heart icon Red.png
 │   └── heart icon Black.png
 └── sounds/
-    ├── Lobby-Music.mp3          ← Menu background music
-    ├── Ingame-Music.mp3         ← In-game background music
-    ├── Arrow-Sound.mp3          ← Correct tap SFX
-    ├── Wrong Move-Sound.mp3     ← Wrong tap / blocked SFX
-    ├── Win-Sound.mp3            ← Victory SFX
-    └── Lose-Sound.mp3           ← Game-over SFX (lives = 0 only)
+    ├── Lobby-Music.mp3          
+    ├── Ingame-Music.mp3         
+    ├── Arrow-Sound.mp3          
+    ├── Wrong Move-Sound.mp3     
+    ├── Win-Sound.mp3            
+    └── Lose-Sound.mp3           
 ```
 
 ---
@@ -191,8 +191,7 @@ assets/
 
 ### HUD (Head-Up Display)
 ```
-[← Back]  Level N          ♥ ♥ ♥   XXs
-[════════════════ progress bar ════]
+
 ```
 - Back button exits to Level Select.
 - Hearts show remaining lives (red = alive, outline = lost).

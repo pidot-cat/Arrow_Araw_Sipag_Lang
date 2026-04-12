@@ -316,10 +316,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: theme.accent,
-            activeTrackColor: theme.accent.withAlpha(80),
-            inactiveThumbColor: Colors.grey.shade600,
-            inactiveTrackColor: Colors.grey.shade800,
+            thumbColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) return theme.accent;
+              return Colors.grey.shade600;
+            }),
+            trackColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) return theme.accent.withAlpha(80);
+              return Colors.grey.shade800;
+            }),
           ),
         ],
       ),

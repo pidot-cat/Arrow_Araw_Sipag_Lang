@@ -316,7 +316,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: theme.accent,
+            activeThumbColor: theme.accent,
             activeTrackColor: theme.accent.withAlpha(80),
             inactiveThumbColor: Colors.grey.shade600,
             inactiveTrackColor: Colors.grey.shade800,

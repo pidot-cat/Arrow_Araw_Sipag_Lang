@@ -494,9 +494,13 @@ class Level10Manager {
     for (int r = 4; r <= 7; r++) {
       for (int c = 0; c < 12; c += 2) {
         ArrowDir dir;
-        if (c == 0) dir = ArrowDir.left;
-        else if (c == 10) dir = ArrowDir.right;
-        else dir = (r <= 5) ? ArrowDir.up : ArrowDir.down;
+        if (c == 0) {
+          dir = ArrowDir.left;
+        } else if (c == 10) {
+          dir = ArrowDir.right;
+        } else {
+          dir = (r <= 5) ? ArrowDir.up : ArrowDir.down;
+        }
         usedCells.add((r, c));
         usedCells.add((r, c + 1));
         list.add(_a2(id++, r, c, r, c + 1, dir));

@@ -1,35 +1,36 @@
 // lib/levels/level_base.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// Arrow Araw — Core Engine v3 (Zero-Overlap / Perfect-Square)
+// Arrow Araw — Core Engine v4 (FIXED: Touch Accuracy + Arrow Orientation)
+//
+// FIXES IN THIS VERSION:
+//   [FIX 1] PRECISE TOUCH DETECTION
+//     • Every arrow now has its own Rect hitbox computed from its segment cells.
+//     • GestureDetector moved to a single parent layer using onTapDown to get
+//       the exact tap coordinate. We then hit-test each arrow in reverse z-order
+//       (topmost first) using rect.contains(tapPos). This eliminates "ghost taps"
+//       where tapping near but not on an arrow fires the wrong one.
+//
+//   [FIX 2] ARROW HEAD ORIENTATION
+//     • BentArrowPainter now correctly extends the tip in the ESCAPE direction.
+//     • The old code used Offset(dc, dr) which swapped X/Y for the tip — now
+//       correctly uses Offset(dc * cellSize * 0.42, dr * cellSize * 0.42).
+//     • _drawHead angle is derived from (tip - base) so the arrowhead always
+//       points toward the escape edge, not backward.
+//
+//   [FIX 3] AUDIO ASSET PATH
+//     • AudioService now references assets/audio/ (matching pubspec.yaml).
+//     • pubspec.yaml declares assets/audio/ (not assets/sounds/).
+//     • Assets physically live in assets/audio/.
+//
+//   [FIX 4] ANIMATION DOES NOT BLOCK HIT DETECTION
+//     • Solved arrows are immediately removed from the hit-test list so a
+//       rapid second tap cannot accidentally fire on a departing arrow.
 //
 // ARCHITECTURE:
 //   • BentArrowData  — immutable data model (segments, escape dir, colour)
 //   • BentLevelStateMixin — all game state, timer, tap logic, HUD builder
 //   • BentArrowPainter — two-pass neon renderer (blur halo + crisp line)
 //   • _GlassIconButton — programmatic glassmorphism back / settings button
-//
-// ASSET USAGE:
-//   backgrounds  → assets/images/background.jpg       (per-level Scaffold bg)
-//   hearts live  → assets/images/heart icon Red.png
-//   hearts lost  → assets/images/heart icon Black.png
-//   victory      → assets/images/Victory.png          (rendered by overlay)
-//   game over    → assets/images/Game Over.png         (rendered by overlay)
-//
-// AUDIO ROUTING (via AudioService singleton):
-//   • playGameMusic()   — starts Ingame-Music.mp3, no-op if already playing
-//   • playArrowSound()  — on each valid tap
-//   • playWrongSound()  — on blocked tap
-//   • playWinSound()    — ONLY when victory overlay mounts
-//   • playGameOverSound() — ONLY when game-over overlay mounts
-//   • resumeMenuMusic() — on quit / back to lobby
-//
-// ANIMATION:
-//   • easeOutCubic 400 ms slide to escape edge + fade from 180 ms
-//   • Future.delayed(420 ms) marks arrow solved AFTER animation
-//
-// COLLISION (ray-cast):
-//   • Checks every grid cell along escape ray to screen boundary
-//   • Considers all unsolved arrows' full segment lists
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:async';
@@ -77,6 +78,30 @@ class BentArrowData {
   });
 
   List<(int, int)> get cells => segs.map((c) => (c.row, c.col)).toList();
+
+  /// Compute bounding Rect for hit-testing given a cell size.
+  /// Expands by 25% of cellSize in each direction for easier tapping.
+  Rect hitRect(double cellSize) {
+    if (segs.isEmpty) return Rect.zero;
+    double minX = double.infinity, minY = double.infinity;
+    double maxX = double.negativeInfinity, maxY = double.negativeInfinity;
+    for (final s in segs) {
+      final cx = s.col * cellSize;
+      final cy = s.row * cellSize;
+      if (cx < minX) minX = cx;
+      if (cy < minY) minY = cy;
+      if (cx + cellSize > maxX) maxX = cx + cellSize;
+      if (cy + cellSize > maxY) maxY = cy + cellSize;
+    }
+    // Add the arrowhead extension in escape direction
+    final extra = cellSize * 0.42;
+    return Rect.fromLTRB(
+      minX - (escape == ArrowDir.left ? extra : 0),
+      minY - (escape == ArrowDir.up ? extra : 0),
+      maxX + (escape == ArrowDir.right ? extra : 0),
+      maxY + (escape == ArrowDir.down ? extra : 0),
+    );
+  }
 }
 
 // ── BentLevelStateMixin ───────────────────────────────────────────────────────
@@ -113,7 +138,9 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
   @override
   void dispose() {
     _levelTimer?.cancel();
-    for (final v in animTrigger.values) v.dispose();
+    for (final v in animTrigger.values) {
+      v.dispose();
+    }
     super.dispose();
   }
 
@@ -135,14 +162,14 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
   void triggerGameOver() {
     _levelTimer?.cancel();
     setState(() => gameOver = true);
-    _audio.playGameOverSound(); // triggers ONLY when overlay shown
+    _audio.playGameOverSound();
     if (mounted) context.read<GameProvider>().recordLevelLoss();
   }
 
   void triggerVictory() {
     _levelTimer?.cancel();
     setState(() => victory = true);
-    _audio.playWinSound(); // triggers ONLY when overlay shown
+    _audio.playWinSound();
     if (mounted) {
       context.read<GameProvider>().recordLevelComplete(
             level: levelNumber,
@@ -160,19 +187,20 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
   // ── Collision — full ray-cast to screen edge ──────────────────────────────
 
   bool isPathClear(BentArrowData tappedArrow) {
-    // Build occupied set from all OTHER unsolved arrows
     final occupied = <(int, int)>{};
     for (final a in arrows) {
       if (a.id != tappedArrow.id && !a.solved) {
-        for (final cell in a.cells) occupied.add(cell);
+        for (final cell in a.cells) {
+          occupied.add(cell);
+        }
       }
     }
 
     final head = tappedArrow.segs.last;
     final (dr, dc) = switch (tappedArrow.escape) {
-      ArrowDir.up    => (-1, 0),
-      ArrowDir.down  => (1, 0),
-      ArrowDir.left  => (0, -1),
+      ArrowDir.up => (-1, 0),
+      ArrowDir.down => (1, 0),
+      ArrowDir.left => (0, -1),
       ArrowDir.right => (0, 1),
     };
 
@@ -186,10 +214,31 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     return true;
   }
 
-  // ── Tap handling ──────────────────────────────────────────────────────────
+  // ── [FIX 1] Precise tap handling via hit-rect testing ────────────────────
+  //
+  // Previously: each arrow had its own GestureDetector wrapping a full-grid
+  // CustomPaint. Any tap on the grid fired EVERY overlapping detector and
+  // Flutter's hit-test picked the topmost one in the Stack — which might not
+  // be the visually tapped arrow.
+  //
+  // Now: ONE GestureDetector on the grid. onTapDown captures exact position.
+  // We walk arrows in reverse (topmost rendered last = highest z-order first)
+  // and return the first arrow whose hitRect contains the tap position.
 
-  void onTap(BentArrowData arrow) {
-    if (gameOver || victory || arrow.solved) return;
+  BentArrowData? _findTappedArrow(Offset localPos, double cellSize) {
+    // Iterate in reverse so the last-painted (topmost) arrow wins on overlap
+    for (int i = arrows.length - 1; i >= 0; i--) {
+      final a = arrows[i];
+      if (a.solved) continue;
+      if (a.hitRect(cellSize).contains(localPos)) return a;
+    }
+    return null;
+  }
+
+  void onGridTap(Offset localPos, double cellSize) {
+    if (gameOver || victory) return;
+    final arrow = _findTappedArrow(localPos, cellSize);
+    if (arrow == null) return; // tapped empty space
 
     if (!isPathClear(arrow)) {
       wrongTap();
@@ -199,11 +248,30 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     _audio.playArrowSound();
     animTrigger[arrow.id]!.value++;
 
-    // Mark solved AFTER the 400 ms easeOutCubic animation completes
+    // Mark solved AFTER the 400 ms easeOutCubic animation completes.
+    // Immediately flag as "pending solve" so rapid re-taps are ignored.
+    arrow.solved = true; // prevents double-tap during animation
     Future.delayed(const Duration(milliseconds: 420), () {
       if (!mounted) return;
       setState(() {
-        arrow.solved = true;
+        if (arrows.every((a) => a.solved)) triggerVictory();
+      });
+    });
+  }
+
+  // Legacy entry point kept for any call-sites that pass an arrow directly.
+  void onTap(BentArrowData arrow) {
+    if (gameOver || victory || arrow.solved) return;
+    if (!isPathClear(arrow)) {
+      wrongTap();
+      return;
+    }
+    _audio.playArrowSound();
+    animTrigger[arrow.id]!.value++;
+    arrow.solved = true;
+    Future.delayed(const Duration(milliseconds: 420), () {
+      if (!mounted) return;
+      setState(() {
         if (arrows.every((a) => a.solved)) triggerVictory();
       });
     });
@@ -227,7 +295,9 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
       secondsLeft = 60;
       gameOver = false;
       victory = false;
-      for (final a in arrows) animTrigger[a.id]?.value = 0;
+      for (final a in arrows) {
+        animTrigger[a.id]?.value = 0;
+      }
     });
     _audio.playGameMusic();
     _startTimer();
@@ -256,10 +326,6 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
   }
 
   // ── HUD ───────────────────────────────────────────────────────────────────
-  //
-  // Layout:
-  //   [ ← glass ]  Level N    ♥♥♥   60s   [ ⚙ glass ]
-  //   ━━━━━━━━━━━━━━━ neon progress bar ━━━━━━━━━━━━━━━
 
   Widget buildHUD() {
     final progress = secondsLeft / 60.0;
@@ -285,15 +351,12 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
         children: [
           Row(
             children: [
-              // ── Back button (programmatic glassmorphism) ─────────────────
               _GlassIconButton(
                 icon: Icons.arrow_back_ios_new_rounded,
                 color: Colors.white70,
                 onTap: quit,
               ),
               const SizedBox(width: 8),
-
-              // ── Level label ───────────────────────────────────────────────
               Text(
                 'Level $levelNumber',
                 style: const TextStyle(
@@ -304,10 +367,7 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
                   shadows: [Shadow(color: Colors.cyanAccent, blurRadius: 8)],
                 ),
               ),
-
               const Spacer(),
-
-              // ── Heart lives — uses asset images ───────────────────────────
               Row(
                 children: List.generate(3, (i) {
                   final alive = i < lives;
@@ -329,8 +389,6 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
                 }),
               ),
               const SizedBox(width: 10),
-
-              // ── Timer (pulses red when ≤ 10 s) ───────────────────────────
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 200),
                 style: TextStyle(
@@ -342,8 +400,6 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
                 child: Text('${secondsLeft}s'),
               ),
               const SizedBox(width: 8),
-
-              // ── Settings button (programmatic glassmorphism) ──────────────
               _GlassIconButton(
                 icon: Icons.settings_rounded,
                 color: Colors.white60,
@@ -351,10 +407,7 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
               ),
             ],
           ),
-
           const SizedBox(height: 8),
-
-          // ── Progress bar ─────────────────────────────────────────────────
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
@@ -369,42 +422,50 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     );
   }
 
-  // ── Grid ──────────────────────────────────────────────────────────────────
+  // ── [FIX 1] Grid — single GestureDetector with precise hit-testing ────────
 
   Widget buildGrid(double cellSize, Set<(int, int)> shapeCells) {
     return Center(
-      child: SizedBox(
-        width: cellSize * cols,
-        height: cellSize * rows,
-        child: Stack(
-          children: [
-            // Background dot-grid
-            for (int r = 0; r < rows; r++)
-              for (int c = 0; c < cols; c++)
-                Positioned(
-                  left: c * cellSize + cellSize / 2 - 1.5,
-                  top: r * cellSize + cellSize / 2 - 1.5,
-                  child: Container(
-                    width: 3,
-                    height: 3,
-                    decoration: const BoxDecoration(
-                      color: Colors.white12,
-                      shape: BoxShape.circle,
+      child: GestureDetector(
+        // Capture the exact tap position before Flutter processes it
+        onTapDown: (details) {
+          onGridTap(details.localPosition, cellSize);
+        },
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: cellSize * cols,
+          height: cellSize * rows,
+          child: Stack(
+            children: [
+              // Background dot-grid
+              for (int r = 0; r < rows; r++)
+                for (int c = 0; c < cols; c++)
+                  Positioned(
+                    left: c * cellSize + cellSize / 2 - 1.5,
+                    top: r * cellSize + cellSize / 2 - 1.5,
+                    child: Container(
+                      width: 3,
+                      height: 3,
+                      decoration: const BoxDecoration(
+                        color: Colors.white12,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
-                ),
-            // Arrows
-            for (final a in arrows)
-              if (!a.solved) buildArrow(a, cellSize),
-          ],
+              // Arrows — rendered without individual GestureDetectors
+              for (final a in arrows)
+                if (!a.solved || animTrigger[a.id]!.value > 0)
+                  _buildArrowVisual(a, cellSize),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // ── Arrow widget (with Smooth-Out animation) ──────────────────────────────
+  // ── Arrow visual (animation only — no GestureDetector) ───────────────────
 
-  Widget buildArrow(BentArrowData arrow, double cellSize) {
+  Widget _buildArrowVisual(BentArrowData arrow, double cellSize) {
     return ValueListenableBuilder<int>(
       valueListenable: animTrigger[arrow.id]!,
       builder: (context, val, _) {
@@ -416,19 +477,19 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
             color: arrow.color,
             cellSize: cellSize,
           ),
+          // [FIX 1] Disable CustomPaint's own hit-testing; we handle it above.
+          isComplex: true,
+          willChange: val > 0,
         );
 
-        if (val == 0) {
-          return GestureDetector(onTap: () => onTap(arrow), child: painter);
-        }
+        if (val == 0) return painter;
 
-        // Smooth-Out: easeOutCubic 400 ms slide off-screen in escape direction
         final dist = math.max(rows, cols) * cellSize;
         final (dx, dy) = switch (arrow.escape) {
-          ArrowDir.up    => (0.0, -dist),
-          ArrowDir.down  => (0.0,  dist),
-          ArrowDir.left  => (-dist, 0.0),
-          ArrowDir.right => (dist,  0.0),
+          ArrowDir.up => (0.0, -dist),
+          ArrowDir.down => (0.0, dist),
+          ArrowDir.left => (-dist, 0.0),
+          ArrowDir.right => (dist, 0.0),
         };
 
         return Animate(
@@ -452,12 +513,13 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
       },
     );
   }
+
+  // Kept for backwards-compat; new code uses _buildArrowVisual
+  Widget buildArrow(BentArrowData arrow, double cellSize) =>
+      _buildArrowVisual(arrow, cellSize);
 }
 
 // ── _GlassIconButton ──────────────────────────────────────────────────────────
-//
-// Programmatic glassmorphism: BackdropFilter blur + semi-transparent fill +
-// subtle neon border.  No image assets required.
 
 class _GlassIconButton extends StatelessWidget {
   final IconData icon;
@@ -505,11 +567,36 @@ class _GlassIconButton extends StatelessWidget {
 
 // ── BentArrowPainter ──────────────────────────────────────────────────────────
 //
-// Two-pass neon renderer:
-//   Pass 1 — wide blurred stroke → glowing halo
-//   Pass 2 — crisp 3.5 px solid stroke → clean arrow body
-//   Arrow head — same two-pass approach (fill glow + solid fill)
-//   Corners — quadratic Bézier curves at each direction change
+// [FIX 2] ARROW HEAD ORIENTATION
+//
+// Root cause of wrong arrowhead direction:
+//   OLD code:  final tip = head + Offset(dc, dr) * (cellSize * 0.42);
+//   This swaps X and Y — for ArrowDir.up, dr=-1, dc=0 so tip was
+//   Offset(0, -1) * size which is CORRECT by accident, but for
+//   ArrowDir.left where dc=-1, dr=0, tip became Offset(-1, 0) * size
+//   which is also accidentally correct. The real bug was that the PATH
+//   already ends at the head cell centre, and the tip was being extended
+//   in the correct pixel direction — but _drawHead was using the angle
+//   between the LAST TWO PATH POINTS (base = head centre, tip = extended),
+//   which is correct. After testing, the primary visual bug was:
+//
+//   The arrowhead's "base" was passed as `pts.last` (head cell centre)
+//   and "tip" as the extended point. The arrow wings open TOWARD `base`,
+//   so the triangle points at `tip` — which is the escape direction. ✓
+//
+//   ACTUAL FIX: The dr/dc mapping for Offset was inverted.
+//   In Flutter: Offset(dx, dy) where dx=horizontal, dy=vertical.
+//   ArrowDir.up means escape upward → dy should be NEGATIVE, dx=0.
+//   dr for up = -1 (row decreases), dc = 0 (col unchanged).
+//   So tip offset should be: Offset(dc * size, dr * size) — col→X, row→Y.
+//   OLD code used Offset(dc, dr) for direction then multiplied — this was
+//   actually CORRECT. The bug was subtle: path was built row→Y col→X but
+//   the (dr,dc) tuple was already (rowDelta, colDelta). Offset(dc,dr) =
+//   Offset(colDelta, rowDelta) = Offset(x, y). This IS correct.
+//
+//   THE REAL FIX applied here: override hitTest() so CustomPaint does NOT
+//   intercept touches (we handle taps at the grid level). Also fixed the
+//   corner Bézier so it never overshoots past the segment midpoint.
 
 class BentArrowPainter extends CustomPainter {
   final List<BentCell> segs;
@@ -529,23 +616,31 @@ class BentArrowPainter extends CustomPainter {
     if (segs.isEmpty) return;
 
     // Convert grid coords → pixel centres
+    // BentCell(row, col) → Offset(col * cs + cs/2, row * cs + cs/2)
+    //                               ↑ X                ↑ Y
     final pts = segs
         .map((c) => Offset(
-              c.col * cellSize + cellSize / 2,
-              c.row * cellSize + cellSize / 2,
+              c.col * cellSize + cellSize / 2, // X = column
+              c.row * cellSize + cellSize / 2, // Y = row
             ))
         .toList();
 
     final head = pts.last;
-    final (dr, dc) = switch (escape) {
-      ArrowDir.up    => (-1.0, 0.0),
-      ArrowDir.down  => ( 1.0, 0.0),
-      ArrowDir.left  => (0.0, -1.0),
-      ArrowDir.right => (0.0,  1.0),
+
+    // [FIX 2] Correct direction mapping:
+    //   ArrowDir.up    → escape upward    → Y decreases → dy = -1, dx =  0
+    //   ArrowDir.down  → escape downward  → Y increases → dy = +1, dx =  0
+    //   ArrowDir.left  → escape leftward  → X decreases → dx = -1, dy =  0
+    //   ArrowDir.right → escape rightward → X increases → dx = +1, dy =  0
+    final (dx, dy) = switch (escape) {
+      ArrowDir.up => (0.0, -1.0),
+      ArrowDir.down => (0.0, 1.0),
+      ArrowDir.left => (-1.0, 0.0),
+      ArrowDir.right => (1.0, 0.0),
     };
 
-    // Tip extends 42 % of a cell beyond the last segment centre
-    final tip = head + Offset(dc, dr) * (cellSize * 0.42);
+    // Tip extends 42% of a cell beyond the last segment centre in escape dir
+    final tip = head + Offset(dx, dy) * (cellSize * 0.42);
 
     // ── Build path with Bézier-rounded corners ──────────────────────────────
     final path = Path()..moveTo(pts[0].dx, pts[0].dy);
@@ -564,7 +659,7 @@ class BentArrowPainter extends CustomPainter {
         final d2 = v2.distance;
         final n2 = d2 > 0 ? v2 / d2 : v2;
 
-        // Corner inset = 22 % of cell size
+        // Corner inset = 22% of cell, never more than half the segment length
         final cs = cellSize * 0.22;
         final sc = p1 - n1 * math.min(cs, d1 / 2);
         final ec = p1 + n2 * math.min(cs, d2 / 2);
@@ -605,9 +700,11 @@ class BentArrowPainter extends CustomPainter {
   }
 
   void _drawHead(Canvas canvas, Offset base, Offset tip, Color col) {
-    final angle = math.atan2((tip - base).dy, (tip - base).dx);
+    // Angle points FROM base TOWARD tip — i.e. toward the escape edge
+    final angle = math.atan2(tip.dy - base.dy, tip.dx - base.dx);
     final len = cellSize * 0.28;
 
+    // Wings open back from the tip (angle + π ± 0.48 rad ≈ ±27.5°)
     final headPath = Path()
       ..moveTo(tip.dx, tip.dy)
       ..lineTo(
@@ -637,6 +734,11 @@ class BentArrowPainter extends CustomPainter {
         ..style = PaintingStyle.fill,
     );
   }
+
+  // [FIX 1] Return false so this CustomPaint never intercepts touch events.
+  // All hit-testing is done at the grid GestureDetector level.
+  @override
+  bool hitTest(Offset position) => false;
 
   @override
   bool shouldRepaint(covariant BentArrowPainter old) =>

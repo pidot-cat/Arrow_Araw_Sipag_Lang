@@ -11,8 +11,11 @@ import 'game_screen_lvl_2.dart';
 
 Set<(int, int)> _allCells(int rows, int cols) {
   final s = <(int, int)>{};
-  for (int r = 0; r < rows; r++)
-    for (int c = 0; c < cols; c++) s.add((r, c));
+  for (int r = 0; r < rows; r++) {
+    for (int c = 0; c < cols; c++) {
+      s.add((r, c));
+    }
+  }
   return s;
 }
 
@@ -42,7 +45,7 @@ class _State extends State<GameScreenLvl1> with BentLevelStateMixin<GameScreenLv
         SafeArea(child: Column(children: [
           buildHUD(),
           const SizedBox(height: 4),
-          Text('Solid Square · ${rows}×$cols · ${Level1Manager.build().length} Arrows',
+          Text('Solid Square · $rows×$cols · ${Level1Manager.build().length} Arrows',
               style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12, letterSpacing: 1.1)),
           const SizedBox(height: 8),
           Expanded(child: Center(child: buildGrid(cellSize, shape))),

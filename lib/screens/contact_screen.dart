@@ -1,10 +1,15 @@
 // lib/screens/contact_screen.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// [FIX 5A] Email validation — sender email must match logged-in Supabase user.
-// [FIX 5B] Message forwarded to arrowarawsipaglang@gmail.com via EmailJS.
-// [FIX 5C] template_params keys EXACTLY match EmailJS dashboard placeholders:
-//          {{from_name}}  {{reply_to}}  {{message}}
-// [FIX 5D] Verbose status/text/exception logging — surfaces 403/400 causes.
+// Arrow Araw — Contact Us Screen  (FINAL RECTIFICATION v2)
+//
+// [FIX CONTACT-1] Email field REMOVED from UI — user only types Name + Message.
+// [FIX CONTACT-2] Authenticated user's email is read from Supabase and used
+//                 automatically in the backend (reply_to / from_name fallback).
+//                 No email input required from the user.
+// [FIX CONTACT-3] Validation now only requires a non-empty Message.
+//                 Name remains optional (falls back to account email in payload).
+// [FIX CONTACT-4] EmailJS payload unchanged — reply_to still uses the account
+//                 email so the team can reply directly to the sender.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:convert';
@@ -17,13 +22,6 @@ import '../widgets/gradient_input_field.dart';
 import '../utils/constants.dart';
 
 // ── EmailJS credentials ───────────────────────────────────────────────────────
-// These MUST match your EmailJS dashboard exactly.
-//   service_id  → EmailJS > Email Services > your service ID
-//   template_id → EmailJS > Email Templates > your template ID
-//   user_id     → EmailJS > Account > Public Key
-//
-// Your template MUST contain these EXACT placeholders (case-sensitive):
-//   {{from_name}}   {{reply_to}}   {{message}}
 const String _kServiceId  = 'service_vtus5km';
 const String _kTemplateId = 'template_eb907ud';
 const String _kPublicKey  = 'Pc1EQujpT72L2Po8V';
@@ -37,65 +35,47 @@ class ContactScreen extends StatefulWidget {
 
 class _ContactScreenState extends State<ContactScreen> {
   final _nameCtrl    = TextEditingController();
-  final _emailCtrl   = TextEditingController();
   final _messageCtrl = TextEditingController();
   bool  _isSending   = false;
 
-  String get _loggedInEmail =>
+  // [FIX CONTACT-2] Account email auto-fetched — never shown as an input field
+  String get _accountEmail =>
       Supabase.instance.client.auth.currentUser?.email?.trim() ?? '';
-
-  @override
-  void initState() {
-    super.initState();
-    _emailCtrl.text = _loggedInEmail; // [FIX 5A] pre-fill locked email
-  }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _emailCtrl.dispose();
     _messageCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     final name    = _nameCtrl.text.trim();
-    final email   = _emailCtrl.text.trim();
     final message = _messageCtrl.text.trim();
 
-    if (email.isEmpty || message.isEmpty) {
-      _snack('Please fill in all fields.', Colors.red);
-      return;
-    }
-
-    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
-      _snack('Please enter a valid email address.', Colors.red);
-      return;
-    }
-
-    // [FIX 5A] Block send if email doesn't match logged-in account
-    final accountEmail = _loggedInEmail.toLowerCase();
-    if (accountEmail.isNotEmpty && email.toLowerCase() != accountEmail) {
-      _snack('Email must match your account ($accountEmail).', Colors.orange);
+    // [FIX CONTACT-3] Only message is required
+    if (message.isEmpty) {
+      _snack('Please enter a message.', Colors.red);
       return;
     }
 
     setState(() => _isSending = true);
     try {
-      // [FIX 5C] Keys must EXACTLY match the {{placeholders}} in EmailJS template
+      // reply_to uses the authenticated account email automatically
+      final senderName = name.isNotEmpty ? name : _accountEmail;
+
       final payload = {
         'service_id':  _kServiceId,
         'template_id': _kTemplateId,
         'user_id':     _kPublicKey,
         'template_params': {
-          'from_name': name.isNotEmpty ? name : email, // → {{from_name}}
-          'reply_to':  email,                           // → {{reply_to}}
-          'message':   message,                         // → {{message}}
-          'to_email':  'arrowarawsipaglang@gmail.com',  // → {{to_email}} (if used)
+          'from_name': senderName,                          // → {{from_name}}
+          'reply_to':  _accountEmail,                       // → {{reply_to}}
+          'message':   message,                             // → {{message}}
+          'to_email':  'arrowarawsipaglang@gmail.com',     // → {{to_email}}
         },
       };
 
-      // [FIX 5D] Log outgoing payload
       debugPrint('[EmailJS] POST → $_kEndpoint');
       debugPrint('[EmailJS] Payload → ${jsonEncode(payload)}');
 
@@ -103,19 +83,17 @@ class _ContactScreenState extends State<ContactScreen> {
         Uri.parse(_kEndpoint),
         headers: {
           'Content-Type': 'application/json',
-          'Origin': 'https://www.emailjs.com', // Required by some plans
+          'Origin': 'https://www.emailjs.com',
         },
         body: jsonEncode(payload),
       ).timeout(const Duration(seconds: 15));
 
-      // [FIX 5D] Log full response — exposes 403/400 root causes
       debugPrint('[EmailJS] Status → ${res.statusCode}');
       debugPrint('[EmailJS] Body   → ${res.body}');
 
       if (!mounted) return;
       if (res.statusCode == 200) {
         _nameCtrl.clear();
-        _emailCtrl.clear();
         _messageCtrl.clear();
         _snack('Message sent to arrowarawsipaglang@gmail.com ✓', Colors.green);
       } else {
@@ -123,7 +101,6 @@ class _ContactScreenState extends State<ContactScreen> {
         _snack('Failed: $errorDetail', Colors.red);
       }
     } catch (e, st) {
-      // [FIX 5D] Full exception + stack trace
       debugPrint('[EmailJS] Exception → $e');
       debugPrint('[EmailJS] Stack     → $st');
       if (!mounted) return;
@@ -143,8 +120,7 @@ class _ContactScreenState extends State<ContactScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size     = MediaQuery.of(context).size;
-    final isLocked = _loggedInEmail.isNotEmpty;
+    final size = MediaQuery.of(context).size;
 
     return Scaffold(
       body: BackgroundWrapper(
@@ -164,7 +140,7 @@ class _ContactScreenState extends State<ContactScreen> {
                 style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 15)),
             SizedBox(height: size.height * 0.035),
 
-            // Name → {{from_name}}
+            // ── [FIX CONTACT-1] Name only — Email field REMOVED ──────────────
             GradientInputField(
               hintText: 'Your Name (optional)',
               controller: _nameCtrl,
@@ -173,28 +149,32 @@ class _ContactScreenState extends State<ContactScreen> {
             ),
             const SizedBox(height: 14),
 
-            // Email → {{reply_to}} — locked to account email when signed in
-            GradientInputField(
-              hintText: isLocked ? _loggedInEmail : 'Your Email',
-              controller: _emailCtrl,
-              prefixIcon: Icons.email,
-              keyboardType: TextInputType.emailAddress,
-              readOnly: isLocked,
-            ),
-            if (isLocked)
-              Padding(
-                padding: const EdgeInsets.only(top: 5, left: 4),
+            // ── [FIX CONTACT-2] Account email displayed as read-only badge ───
+            if (_accountEmail.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(10),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.cyanAccent.withAlpha(50)),
+                ),
                 child: Row(children: [
-                  const Icon(Icons.lock_outline, size: 13, color: Colors.cyanAccent),
-                  const SizedBox(width: 4),
-                  Text('Sending from your account email',
+                  const Icon(Icons.lock_outline, size: 16, color: Colors.cyanAccent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Sending from: $_accountEmail',
                       style: TextStyle(
-                          color: Colors.cyanAccent.withAlpha(180), fontSize: 12)),
+                          color: Colors.cyanAccent.withAlpha(200), fontSize: 13),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ]),
               ),
+            if (_accountEmail.isNotEmpty) const SizedBox(height: 14),
 
-            const SizedBox(height: 14),
-            // Message → {{message}}
+            // ── Message ──────────────────────────────────────────────────────
             GradientInputField(
               hintText: 'Describe your problem...',
               controller: _messageCtrl,
@@ -204,12 +184,15 @@ class _ContactScreenState extends State<ContactScreen> {
             ),
             const SizedBox(height: 30),
 
+            // ── Send button ───────────────────────────────────────────────────
             _isSending
                 ? const CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.cyan))
                 : GradientButton(text: 'SEND MESSAGE', onPressed: _submit),
 
             const SizedBox(height: 24),
+
+            // ── Feedback email display ────────────────────────────────────────
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(

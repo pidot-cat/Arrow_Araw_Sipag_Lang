@@ -1,23 +1,20 @@
 // lib/levels/level_base.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// Arrow Araw — Core Engine v7  (PRODUCTION FINAL – DEBUGGED)
+// Arrow Araw — Core Engine v8  (FINAL RECTIFICATION v2)
 //
-// [FIX 1] STRAIGHT ARROWS ONLY — StraightArrowPainter, no bends/L-shapes.
-// [FIX 2] DEBOUNCING — _pendingSolve prevents rapid-tap life loss.
-// [FIX 3] 350 ms + Curves.easeOutCubic animation.
-// [FIX 4] Back button → LevelSelectScreen (not Home).
-// [FIX 5] Idle music resume after 2 s of inactivity.
-// [FIX 6] Clean closed-triangle arrowhead — zero artifacts.
-// [FIX 7] DYNAMIC CELL SCALING v2:
-//           availableSpace = screenWidth * 0.85  (safe margin)
-//           Levels 1-6: cellSize = availableSpace / SMALL_DIVISOR → max size
-//           Levels 7-10: cellSize = availableSpace / actual cols  → dense
-// [FIX 8] SELECTIVE DOTS — dots rendered ONLY under occupied arrow cells.
-// [FIX 9] ARROWHEAD TIP — locked to leading edge based on escapeDirection.
-// [FIX 10] PREMIUM STROKE — doubled strokeWidth + doubled headSize for bold,
-//           clearly visible arrows even at high grid densities.
-// [FIX 11] ENFORCED SQUARE SILHOUETTE — grid container always N×N so the
-//           result is always a Solid Square, never a rectangle.
+// [FIX 7]  RESPONSIVE SCALING v3:
+//           maxGridWidth = screenWidth * 0.85
+//           cellSize     = maxGridWidth / cols   (exact fit, no overflow ever)
+// [FIX 9]  ARROWHEAD TIP — apex locked to the OUTER EDGE of the head cell.
+//           Up → top edge, Down → bottom edge, Left → left edge, Right → right edge.
+// [FIX 10] SHARP NEON RENDERING:
+//           • isAntiAlias: true on every Paint
+//           • strokeWidth 3.5 (crisp, non-blurry shaft)
+//           • Glow blur capped at 4.0 radius (no colour bleed / sabog)
+//           • Solid neon fill on arrowhead — no washout
+// [FIX 11] ENFORCED SQUARE SILHOUETTE — grid SizedBox is always N×N.
+// [FIX 12] SOLVABILITY — level_manager uses reverse-fill to guarantee a valid
+//           topological ordering exists at generation time.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:async';
@@ -89,43 +86,16 @@ class BentArrowData {
   }
 }
 
-// ── [FIX 7] Dynamic cellSize calculator v2 ───────────────────────────────────
-// Formula: availableSpace = screenWidth * 0.85
-//          cellSize       = availableSpace / effectiveDivisor
-//
-// Levels 1-6 (≤ 60 arrows): use a SMALLER effective divisor than the real
-//   grid cols → cells are LARGER → arrows are bold and professional.
-// Levels 7-10 (> 60 arrows): use the real cols so the grid still fits.
-//
-// The grid is ALWAYS square (rows == cols enforced in level_manager.dart),
-// so this produces a strict N×N silhouette on every level.
+// ── [FIX 7] Responsive cellSize v3 ───────────────────────────────────────────
+// Simple and exact: maxGridWidth / cols.
+// Guarantees NO overflow on any screen size for ALL 10 levels.
 double dynamicCellSize({
   required double screenWidth,
   required int cols,
   required int arrowCount,
 }) {
-  // [FIX 7] Safe margin: 85 % of screen width
-  final availableSpace = screenWidth * 0.85;
-
-  // Effective divisor: smaller divisor → larger cells
-  final int effectiveDivisor;
-  if (arrowCount <= 10) {
-    effectiveDivisor = 5;       // Level 1: very large, premium arrows
-  } else if (arrowCount <= 20) {
-    effectiveDivisor = 6;       // Level 2
-  } else if (arrowCount <= 30) {
-    effectiveDivisor = 7;       // Level 3
-  } else if (arrowCount <= 40) {
-    effectiveDivisor = 8;       // Level 4
-  } else if (arrowCount <= 50) {
-    effectiveDivisor = 9;       // Level 5
-  } else if (arrowCount <= 60) {
-    effectiveDivisor = 10;      // Level 6
-  } else {
-    effectiveDivisor = cols;    // Levels 7-10: dense, full grid
-  }
-
-  return availableSpace / effectiveDivisor;
+  final maxGridWidth = screenWidth * 0.85;
+  return maxGridWidth / cols;
 }
 
 // ── BentLevelStateMixin ───────────────────────────────────────────────────────
@@ -204,8 +174,8 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     }
   }
 
-  // [FIX 9] Returns the tip segment based on escape direction
-  BentCell _tipSegment(BentArrowData arrow) {
+  // [FIX 9] Returns the segment whose outer edge is the arrow tip
+  BentCell _headSeg(BentArrowData arrow) {
     switch (arrow.escape) {
       case ArrowDir.left:
       case ArrowDir.up:
@@ -223,7 +193,7 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
         for (final cell in a.cells) { occupied.add(cell); }
       }
     }
-    final tipSeg = _tipSegment(tappedArrow);
+    final tipSeg = _headSeg(tappedArrow);
     final (dr, dc) = switch (tappedArrow.escape) {
       ArrowDir.up    => (-1, 0),
       ArrowDir.down  => (1,  0),
@@ -309,9 +279,6 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     _levelTimer?.cancel();
     _audio.cancelIdleTimer();
     _audio.resumeMenuMusic();
-    // [FIX 4 / FIX 3-NAV] pushAndRemoveUntil with isFirst predicate clears
-    // the entire stack above the root route so pressing Back on LevelSelect
-    // goes directly to Home/Login — no "double-back" bug.
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LevelSelectScreen()),
       (route) => route.isFirst,
@@ -402,10 +369,7 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     );
   }
 
-  // [FIX 7+8+11] buildGrid:
-  //   • dots only on occupied cells
-  //   • grid SizedBox is ALWAYS cols×cols (square silhouette)
-  //   • cellSize passed in from the level screen
+  // [FIX 7+8+11] buildGrid — responsive, square, dots on occupied cells only
   Widget buildGrid(double cellSize, Set<(int, int)> shapeCells) {
     final occupiedCells = <(int, int)>{};
     for (final a in arrows) {
@@ -414,19 +378,15 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
       }
     }
 
-    final dotRadius = (cellSize * 0.07).clamp(2.0, 4.5);
-
-    // [FIX 11] Enforce square: both dimensions use the SAME cellSize * cols
-    // (rows == cols for every level in level_manager.dart, but we clamp here
-    //  as a safety net so the grid is never a rectangle.)
-    final gridSide = cellSize * math.max(rows, cols);
+    final dotRadius = (cellSize * 0.07).clamp(1.5, 4.0);
+    final gridSide  = cellSize * math.max(rows, cols);
 
     return Center(
       child: GestureDetector(
         onTapDown: (d) => onGridTap(d.localPosition, cellSize),
         behavior: HitTestBehavior.opaque,
         child: SizedBox(
-          width:  gridSide,  // [FIX 11] always square
+          width:  gridSide,
           height: gridSide,
           child: Stack(children: [
             for (final cell in occupiedCells)
@@ -519,10 +479,8 @@ class _GlassIconButton extends StatelessWidget {
 }
 
 // ── StraightArrowPainter ──────────────────────────────────────────────────────
-// [FIX 1]  Straight arrows only.
-// [FIX 6]  Closed triangle arrowhead — zero artifacts.
-// [FIX 9]  Tip placed at the LEADING end based on escape direction.
-// [FIX 10] DOUBLED strokeWidth + DOUBLED headSize → premium, visible arrows.
+// [FIX 9]  Apex of arrowhead pinned to the OUTER EDGE of the head cell.
+// [FIX 10] Sharp neon: isAntiAlias true, strokeWidth 3.5, glow blur 4.0 max.
 
 class StraightArrowPainter extends CustomPainter {
   final List<BentCell> segs;
@@ -538,11 +496,23 @@ class StraightArrowPainter extends CustomPainter {
   Offset _centre(BentCell c) =>
       Offset(c.col * cellSize + cellSize / 2, c.row * cellSize + cellSize / 2);
 
+  // [FIX 9] True tip = outer EDGE of head cell in escape direction
+  Offset _outerEdgeTip(BentCell headSeg) {
+    final cx = headSeg.col * cellSize;
+    final cy = headSeg.row * cellSize;
+    return switch (escape) {
+      ArrowDir.up    => Offset(cx + cellSize / 2, cy),               // top edge
+      ArrowDir.down  => Offset(cx + cellSize / 2, cy + cellSize),    // bottom edge
+      ArrowDir.left  => Offset(cx,                cy + cellSize / 2), // left edge
+      ArrowDir.right => Offset(cx + cellSize,     cy + cellSize / 2), // right edge
+    };
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     if (segs.isEmpty) return;
 
-    // [FIX 9] Leading tip: first seg for LEFT/UP, last seg for RIGHT/DOWN
+    // [FIX 9] Head segment based on escape direction
     final BentCell headSeg;
     final BentCell tailSeg;
     switch (escape) {
@@ -559,45 +529,45 @@ class StraightArrowPainter extends CustomPainter {
     }
 
     final tail = _centre(tailSeg);
-    final head = _centre(headSeg);
+    final tip  = _outerEdgeTip(headSeg); // [FIX 9] absolute outer edge
 
+    final shaft = Path()..moveTo(tail.dx, tail.dy)..lineTo(tip.dx, tip.dy);
+
+    // [FIX 10] Subtle glow — low alpha, small blur → no sabog/bleed
+    canvas.drawPath(shaft, Paint()
+      ..color       = color.withAlpha(55)
+      ..strokeWidth = 7.5
+      ..style       = PaintingStyle.stroke
+      ..strokeCap   = StrokeCap.round
+      ..isAntiAlias = true
+      ..maskFilter  = const MaskFilter.blur(BlurStyle.normal, 4.0));
+
+    // [FIX 10] Crisp shaft — strokeWidth 3.5, isAntiAlias true, no blur
+    canvas.drawPath(shaft, Paint()
+      ..color       = color
+      ..strokeWidth = 3.5
+      ..style       = PaintingStyle.stroke
+      ..strokeCap   = StrokeCap.round
+      ..isAntiAlias = true);
+
+    _drawHead(canvas, tip, color);
+  }
+
+  void _drawHead(Canvas canvas, Offset tip, Color col) {
+    // Direction unit vector for angle calculation
     final (dx, dy) = switch (escape) {
       ArrowDir.up    => (0.0, -1.0),
       ArrowDir.down  => (0.0,  1.0),
       ArrowDir.left  => (-1.0, 0.0),
       ArrowDir.right => ( 1.0, 0.0),
     };
+    final angle = math.atan2(dy, dx);
 
-    final tip = head + Offset(dx, dy) * (cellSize * 0.45);
-    final shaft = Path()..moveTo(tail.dx, tail.dy)..lineTo(tip.dx, tip.dy);
+    // [FIX 10] Head size: scales with cell but clamped for dense grids
+    final len  = (cellSize * 0.55).clamp(6.0, 20.0);
+    const wing = 0.48; // tight, sharp triangle
 
-    // [FIX 10] DOUBLED stroke width for premium look on all screen sizes
-    // Old: clamp(2.5, 6.0) → New: clamp(5.0, 12.0)
-    final strokeWidth = (cellSize * 0.36).clamp(5.0, 12.0);
-    final glowWidth   = strokeWidth * 3.2;
-
-    // Glow pass
-    canvas.drawPath(shaft, Paint()
-      ..color = color.withAlpha(90)..strokeWidth = glowWidth
-      ..style = PaintingStyle.stroke..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7));
-
-    // Crisp shaft
-    canvas.drawPath(shaft, Paint()
-      ..color = color..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke..strokeCap = StrokeCap.round);
-
-    _drawHead(canvas, head, tip, color);
-  }
-
-  void _drawHead(Canvas canvas, Offset base, Offset tip, Color col) {
-    final angle = math.atan2(tip.dy - base.dy, tip.dx - base.dx);
-    // [FIX 10] DOUBLED head size for clear visibility
-    // Old: clamp(6.0, 20.0) → New: clamp(12.0, 40.0)
-    final len = (cellSize * 0.68).clamp(12.0, 40.0);
-    const wing = 0.50;
-
-    // [FIX 6] Closed triangle — zero artifacts
+    // [FIX 9] Apex IS the tip — no offset from cell centre
     final headPath = Path()
       ..moveTo(tip.dx, tip.dy)
       ..lineTo(tip.dx + math.cos(angle + math.pi - wing) * len,
@@ -606,11 +576,18 @@ class StraightArrowPainter extends CustomPainter {
                tip.dy + math.sin(angle + math.pi + wing) * len)
       ..close();
 
+    // [FIX 10] Minimal glow on head
     canvas.drawPath(headPath, Paint()
-      ..color = col.withAlpha(130)..style = PaintingStyle.fill
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+      ..color       = col.withAlpha(65)
+      ..style       = PaintingStyle.fill
+      ..isAntiAlias = true
+      ..maskFilter  = const MaskFilter.blur(BlurStyle.normal, 3.0));
+
+    // [FIX 10] Solid neon fill — crisp, high contrast
     canvas.drawPath(headPath, Paint()
-      ..color = col..style = PaintingStyle.fill);
+      ..color       = col
+      ..style       = PaintingStyle.fill
+      ..isAntiAlias = true);
   }
 
   @override

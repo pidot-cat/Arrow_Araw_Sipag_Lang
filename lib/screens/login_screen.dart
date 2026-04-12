@@ -10,6 +10,7 @@ import '../widgets/background_wrapper.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/gradient_input_field.dart';
 import '../utils/constants.dart';
+import '../services/audio_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,6 +20,17 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final AudioService _audioService = AudioService();
+
+  @override
+  void initState() {
+    super.initState();
+    // Stop ALL audio on Login screen — no ghost music during authentication
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _audioService.stopAll();
+    });
+  }
+
   // Controllers hold the text the user types
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();

@@ -29,6 +29,7 @@ class _State extends State<GameScreenLvl2> with BentLevelStateMixin<GameScreenLv
   @override int get levelNumber => 2;
   @override int get rows => Level2Manager.rows;
   @override int get cols => Level2Manager.cols;
+  @override int get arrowCount => Level2Manager.build().length;
   @override List<BentArrowData> Function() get buildArrowsFn => Level2Manager.build;
   @override Widget Function() get nextLevelBuilder =>
       () => const GameScreenLvl3();
@@ -38,7 +39,12 @@ class _State extends State<GameScreenLvl2> with BentLevelStateMixin<GameScreenLv
 
   @override
   Widget build(BuildContext context) {
-    final cellSize = (MediaQuery.of(context).size.width * 0.88) / Level2Manager.cols;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final cellSize = dynamicCellSize(
+      screenWidth: screenWidth,
+      cols: Level2Manager.cols,
+      arrowCount: Level2Manager.build().length,
+    );
     final shape = _allCells(rows, cols);
     return Scaffold(
       backgroundColor: AppColors.darkNavy,

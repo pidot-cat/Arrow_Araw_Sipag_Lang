@@ -1,6 +1,6 @@
 // lib/levels/level_base.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// Arrow Araw — Core Engine v5  (FINAL RECTIFICATION)
+// Arrow Araw — Core Engine v6  (PRODUCTION FINAL)
 //
 // [FIX 1] STRAIGHT ARROWS ONLY — StraightArrowPainter, no bends/L-shapes.
 // [FIX 2] DEBOUNCING — _pendingSolve prevents rapid-tap life loss.
@@ -8,6 +8,9 @@
 // [FIX 4] Back button → LevelSelectScreen (not Home).
 // [FIX 5] Idle music resume after 2 s of inactivity.
 // [FIX 6] Clean closed-triangle arrowhead — zero artifacts.
+// [FIX 7] DYNAMIC CELL SCALING — cellSize auto-increases for low-arrow levels.
+// [FIX 8] SELECTIVE DOTS — dots rendered ONLY under occupied arrow cells.
+// [FIX 9] ARROWHEAD TIP — locked to leading edge based on escapeDirection.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:async';
@@ -79,12 +82,34 @@ class BentArrowData {
   }
 }
 
+// ── [FIX 7] Dynamic cellSize calculator ──────────────────────────────────────
+// Lower arrow counts get a smaller effective divisor → bigger cells → bolder look.
+double dynamicCellSize({
+  required double screenWidth,
+  required int cols,
+  required int arrowCount,
+}) {
+  final gridPx = screenWidth * 0.88;
+  final int effectiveCols;
+  if (arrowCount <= 20) {
+    effectiveCols = 5;       // Level 1-2: very large, bold arrows
+  } else if (arrowCount <= 40) {
+    effectiveCols = 7;       // Level 3-4: large arrows
+  } else if (arrowCount <= 60) {
+    effectiveCols = 10;      // Level 5-6: medium arrows
+  } else {
+    effectiveCols = cols;    // Level 7-10: dense, uses full grid
+  }
+  return gridPx / effectiveCols;
+}
+
 // ── BentLevelStateMixin ───────────────────────────────────────────────────────
 
 mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
   int get levelNumber;
   int get rows;
   int get cols;
+  int get arrowCount;  // [FIX 7] used by dynamicCellSize
   List<BentArrowData> Function() get buildArrowsFn;
   Widget Function() get nextLevelBuilder;
 
@@ -97,7 +122,6 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
   final Map<int, ValueNotifier<int>> animTrigger = {};
   final AudioService _audio = AudioService();
 
-  // [FIX 2] Debounce: arrows currently mid-animation
   final Set<int> _pendingSolve = {};
 
   void initLevelState() {
@@ -155,6 +179,18 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     }
   }
 
+  // [FIX 9] Returns the tip segment based on escape direction
+  BentCell _tipSegment(BentArrowData arrow) {
+    switch (arrow.escape) {
+      case ArrowDir.left:
+      case ArrowDir.up:
+        return arrow.segs.first;
+      case ArrowDir.right:
+      case ArrowDir.down:
+        return arrow.segs.last;
+    }
+  }
+
   bool isPathClear(BentArrowData tappedArrow) {
     final occupied = <(int, int)>{};
     for (final a in arrows) {
@@ -162,15 +198,16 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
         for (final cell in a.cells) { occupied.add(cell); }
       }
     }
-    final head = tappedArrow.segs.last;
+    // [FIX 9] Check clearance from the TIP segment (leading edge)
+    final tipSeg = _tipSegment(tappedArrow);
     final (dr, dc) = switch (tappedArrow.escape) {
       ArrowDir.up    => (-1, 0),
       ArrowDir.down  => (1,  0),
       ArrowDir.left  => (0, -1),
       ArrowDir.right => (0,  1),
     };
-    var r = head.row + dr;
-    var c = head.col + dc;
+    var r = tipSeg.row + dr;
+    var c = tipSeg.col + dc;
     while (r >= 0 && r < rows && c >= 0 && c < cols) {
       if (occupied.contains((r, c))) return false;
       r += dr; c += dc;
@@ -182,7 +219,7 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     for (int i = arrows.length - 1; i >= 0; i--) {
       final a = arrows[i];
       if (a.solved) continue;
-      if (_pendingSolve.contains(a.id)) continue; // [FIX 2]
+      if (_pendingSolve.contains(a.id)) continue;
       if (a.hitRect(cellSize).contains(localPos)) return a;
     }
     return null;
@@ -190,7 +227,7 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
 
   void onGridTap(Offset localPos, double cellSize) {
     if (gameOver || victory) return;
-    _audio.startIdleResumeTimer(); // [FIX 5]
+    _audio.startIdleResumeTimer();
 
     final arrow = _findTappedArrow(localPos, cellSize);
     if (arrow == null) return;
@@ -198,11 +235,10 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     if (!isPathClear(arrow)) { wrongTap(); return; }
 
     _audio.playArrowSound();
-    _pendingSolve.add(arrow.id); // [FIX 2] lock before animation
+    _pendingSolve.add(arrow.id);
     arrow.solved = true;
     animTrigger[arrow.id]!.value++;
 
-    // [FIX 3] 350 ms + small buffer for state cleanup
     Future.delayed(const Duration(milliseconds: 380), () {
       if (!mounted) return;
       _pendingSolve.remove(arrow.id);
@@ -245,7 +281,6 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     _startTimer();
   }
 
-  // [FIX 4] Back → Level Select, not Home
   void quit() {
     _levelTimer?.cancel();
     _audio.cancelIdleTimer();
@@ -340,7 +375,20 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     );
   }
 
+  // [FIX 7+8] buildGrid: dots only on occupied cells, cellSize passed in
   Widget buildGrid(double cellSize, Set<(int, int)> shapeCells) {
+    // [FIX 8] Only render dots where an unsolved arrow currently sits
+    final occupiedCells = <(int, int)>{};
+    for (final a in arrows) {
+      if (!a.solved) {
+        for (final cell in a.cells) {
+          occupiedCells.add(cell);
+        }
+      }
+    }
+
+    final dotRadius = (cellSize * 0.07).clamp(2.0, 4.5);
+
     return Center(
       child: GestureDetector(
         onTapDown: (d) => onGridTap(d.localPosition, cellSize),
@@ -349,16 +397,16 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
           width: cellSize * cols,
           height: cellSize * rows,
           child: Stack(children: [
-            for (int r = 0; r < rows; r++)
-              for (int c = 0; c < cols; c++)
-                Positioned(
-                  left: c * cellSize + cellSize / 2 - 1.5,
-                  top:  r * cellSize + cellSize / 2 - 1.5,
-                  child: Container(
-                      width: 3, height: 3,
-                      decoration: const BoxDecoration(
-                          color: Colors.white12, shape: BoxShape.circle)),
-                ),
+            // [FIX 8] Selective dot rendering — occupied cells only
+            for (final cell in occupiedCells)
+              Positioned(
+                left: cell.$2 * cellSize + cellSize / 2 - dotRadius,
+                top:  cell.$1 * cellSize + cellSize / 2 - dotRadius,
+                child: Container(
+                    width: dotRadius * 2, height: dotRadius * 2,
+                    decoration: const BoxDecoration(
+                        color: Colors.white24, shape: BoxShape.circle)),
+              ),
             for (final a in arrows)
               if (!a.solved || animTrigger[a.id]!.value > 0)
                 _buildArrowVisual(a, cellSize),
@@ -389,7 +437,6 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
           ArrowDir.left  => (-dist, 0.0),
           ArrowDir.right => ( dist, 0.0),
         };
-        // [FIX 3] 350 ms easeOutCubic
         return Animate(effects: [
           MoveEffect(
             begin: Offset.zero, end: Offset(dx, dy),
@@ -440,8 +487,10 @@ class _GlassIconButton extends StatelessWidget {
 }
 
 // ── StraightArrowPainter ──────────────────────────────────────────────────────
-// [FIX 1] Straight line only: tail-centre → head-centre → tip.
-// [FIX 6] Closed triangle arrowhead — no stray line artifacts.
+// [FIX 1] Straight arrows only.
+// [FIX 6] Closed triangle arrowhead.
+// [FIX 7] strokeWidth scales with cellSize → bold on low levels.
+// [FIX 9] Tip placed at the LEADING end based on escape direction.
 
 class StraightArrowPainter extends CustomPainter {
   final List<BentCell> segs;
@@ -460,8 +509,25 @@ class StraightArrowPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (segs.isEmpty) return;
-    final tail = _centre(segs.first);
-    final head = _centre(segs.last);
+
+    // [FIX 9] Leading tip is at first seg for LEFT/UP, last seg for RIGHT/DOWN
+    final BentCell headSeg;
+    final BentCell tailSeg;
+    switch (escape) {
+      case ArrowDir.left:
+      case ArrowDir.up:
+        headSeg = segs.first;
+        tailSeg = segs.last;
+        break;
+      case ArrowDir.right:
+      case ArrowDir.down:
+        headSeg = segs.last;
+        tailSeg = segs.first;
+        break;
+    }
+
+    final tail = _centre(tailSeg);
+    final head = _centre(headSeg);
 
     final (dx, dy) = switch (escape) {
       ArrowDir.up    => (0.0, -1.0),
@@ -473,15 +539,19 @@ class StraightArrowPainter extends CustomPainter {
     final tip = head + Offset(dx, dy) * (cellSize * 0.45);
     final shaft = Path()..moveTo(tail.dx, tail.dy)..lineTo(tip.dx, tip.dy);
 
+    // [FIX 7] Dynamic stroke width: thicker for large cells (low levels)
+    final strokeWidth = (cellSize * 0.18).clamp(2.5, 6.0);
+    final glowWidth  = strokeWidth * 3.2;
+
     // Glow pass
     canvas.drawPath(shaft, Paint()
-      ..color = color.withAlpha(90)..strokeWidth = 11.0
+      ..color = color.withAlpha(90)..strokeWidth = glowWidth
       ..style = PaintingStyle.stroke..strokeCap = StrokeCap.round
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7));
 
     // Crisp shaft
     canvas.drawPath(shaft, Paint()
-      ..color = color..strokeWidth = 3.5
+      ..color = color..strokeWidth = strokeWidth
       ..style = PaintingStyle.stroke..strokeCap = StrokeCap.round);
 
     _drawHead(canvas, head, tip, color);
@@ -489,10 +559,11 @@ class StraightArrowPainter extends CustomPainter {
 
   void _drawHead(Canvas canvas, Offset base, Offset tip, Color col) {
     final angle = math.atan2(tip.dy - base.dy, tip.dx - base.dx);
-    final len = cellSize * 0.30;
+    // [FIX 7] Head size scales with cellSize
+    final len = (cellSize * 0.34).clamp(6.0, 20.0);
     const wing = 0.50;
 
-    // [FIX 6] Clean closed triangle — 3 vertices, no extra lines
+    // [FIX 6] Closed triangle — zero artifacts
     final headPath = Path()
       ..moveTo(tip.dx, tip.dy)
       ..lineTo(tip.dx + math.cos(angle + math.pi - wing) * len,
@@ -517,5 +588,4 @@ class StraightArrowPainter extends CustomPainter {
       old.cellSize != cellSize || old.segs.length != segs.length;
 }
 
-// Alias — keeps any BentArrowPainter references compiling without changes.
 typedef BentArrowPainter = StraightArrowPainter;

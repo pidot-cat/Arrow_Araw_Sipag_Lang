@@ -1,9 +1,10 @@
 // lib/screens/contact_screen.dart
 // ─────────────────────────────────────────────────────────────────────────────
 // [FIX 5A] Email validation — sender email must match logged-in Supabase user.
-//           Field is pre-filled and locked. If user is not logged in, it is
-//           editable but still validated against format.
 // [FIX 5B] Message forwarded to arrowarawsipaglang@gmail.com via EmailJS.
+// [FIX 5C] template_params keys EXACTLY match EmailJS dashboard placeholders:
+//          {{from_name}}  {{reply_to}}  {{message}}
+// [FIX 5D] Verbose status/text/exception logging — surfaces 403/400 causes.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:convert';
@@ -15,6 +16,14 @@ import '../widgets/gradient_button.dart';
 import '../widgets/gradient_input_field.dart';
 import '../utils/constants.dart';
 
+// ── EmailJS credentials ───────────────────────────────────────────────────────
+// These MUST match your EmailJS dashboard exactly.
+//   service_id  → EmailJS > Email Services > your service ID
+//   template_id → EmailJS > Email Templates > your template ID
+//   user_id     → EmailJS > Account > Public Key
+//
+// Your template MUST contain these EXACT placeholders (case-sensitive):
+//   {{from_name}}   {{reply_to}}   {{message}}
 const String _kServiceId  = 'service_vtus5km';
 const String _kTemplateId = 'template_eb907ud';
 const String _kPublicKey  = 'Pc1EQujpT72L2Po8V';
@@ -27,6 +36,7 @@ class ContactScreen extends StatefulWidget {
 }
 
 class _ContactScreenState extends State<ContactScreen> {
+  final _nameCtrl    = TextEditingController();
   final _emailCtrl   = TextEditingController();
   final _messageCtrl = TextEditingController();
   bool  _isSending   = false;
@@ -37,18 +47,19 @@ class _ContactScreenState extends State<ContactScreen> {
   @override
   void initState() {
     super.initState();
-    // [FIX 5A] Pre-fill with the logged-in email
-    _emailCtrl.text = _loggedInEmail;
+    _emailCtrl.text = _loggedInEmail; // [FIX 5A] pre-fill locked email
   }
 
   @override
   void dispose() {
+    _nameCtrl.dispose();
     _emailCtrl.dispose();
     _messageCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
+    final name    = _nameCtrl.text.trim();
     final email   = _emailCtrl.text.trim();
     final message = _messageCtrl.text.trim();
 
@@ -62,7 +73,7 @@ class _ContactScreenState extends State<ContactScreen> {
       return;
     }
 
-    // [FIX 5A] Must match logged-in account email
+    // [FIX 5A] Block send if email doesn't match logged-in account
     final accountEmail = _loggedInEmail.toLowerCase();
     if (accountEmail.isNotEmpty && email.toLowerCase() != accountEmail) {
       _snack('Email must match your account ($accountEmail).', Colors.orange);
@@ -71,31 +82,50 @@ class _ContactScreenState extends State<ContactScreen> {
 
     setState(() => _isSending = true);
     try {
+      // [FIX 5C] Keys must EXACTLY match the {{placeholders}} in EmailJS template
+      final payload = {
+        'service_id':  _kServiceId,
+        'template_id': _kTemplateId,
+        'user_id':     _kPublicKey,
+        'template_params': {
+          'from_name': name.isNotEmpty ? name : email, // → {{from_name}}
+          'reply_to':  email,                           // → {{reply_to}}
+          'message':   message,                         // → {{message}}
+          'to_email':  'arrowarawsipaglang@gmail.com',  // → {{to_email}} (if used)
+        },
+      };
+
+      // [FIX 5D] Log outgoing payload
+      debugPrint('[EmailJS] POST → $_kEndpoint');
+      debugPrint('[EmailJS] Payload → ${jsonEncode(payload)}');
+
       final res = await http.post(
         Uri.parse(_kEndpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'service_id':  _kServiceId,
-          'template_id': _kTemplateId,
-          'user_id':     _kPublicKey,
-          'template_params': {
-            'from_email': email,
-            'message':    message,
-            'to_email':   'arrowarawsipaglang@gmail.com', // [FIX 5B]
-          },
-        }),
-      ).timeout(const Duration(seconds: 10));
+        headers: {
+          'Content-Type': 'application/json',
+          'Origin': 'https://www.emailjs.com', // Required by some plans
+        },
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 15));
+
+      // [FIX 5D] Log full response — exposes 403/400 root causes
+      debugPrint('[EmailJS] Status → ${res.statusCode}');
+      debugPrint('[EmailJS] Body   → ${res.body}');
 
       if (!mounted) return;
       if (res.statusCode == 200) {
+        _nameCtrl.clear();
         _emailCtrl.clear();
         _messageCtrl.clear();
         _snack('Message sent to arrowarawsipaglang@gmail.com ✓', Colors.green);
       } else {
-        debugPrint('EmailJS: ${res.body}');
-        _snack('Failed to send. Please try again.', Colors.red);
+        final errorDetail = res.body.isNotEmpty ? res.body : 'HTTP ${res.statusCode}';
+        _snack('Failed: $errorDetail', Colors.red);
       }
-    } catch (e) {
+    } catch (e, st) {
+      // [FIX 5D] Full exception + stack trace
+      debugPrint('[EmailJS] Exception → $e');
+      debugPrint('[EmailJS] Stack     → $st');
       if (!mounted) return;
       _snack('Network error. Check your connection.', Colors.red);
     } finally {
@@ -105,13 +135,15 @@ class _ContactScreenState extends State<ContactScreen> {
 
   void _snack(String msg, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg), backgroundColor: color,
-      behavior: SnackBarBehavior.floating));
+      content: Text(msg),
+      backgroundColor: color,
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final size    = MediaQuery.of(context).size;
+    final size     = MediaQuery.of(context).size;
     final isLocked = _loggedInEmail.isNotEmpty;
 
     return Scaffold(
@@ -132,7 +164,16 @@ class _ContactScreenState extends State<ContactScreen> {
                 style: TextStyle(color: Colors.white.withAlpha(179), fontSize: 15)),
             SizedBox(height: size.height * 0.035),
 
-            // [FIX 5A] Email field — locked when user is logged in
+            // Name → {{from_name}}
+            GradientInputField(
+              hintText: 'Your Name (optional)',
+              controller: _nameCtrl,
+              prefixIcon: Icons.person,
+              keyboardType: TextInputType.name,
+            ),
+            const SizedBox(height: 14),
+
+            // Email → {{reply_to}} — locked to account email when signed in
             GradientInputField(
               hintText: isLocked ? _loggedInEmail : 'Your Email',
               controller: _emailCtrl,
@@ -147,12 +188,13 @@ class _ContactScreenState extends State<ContactScreen> {
                   const Icon(Icons.lock_outline, size: 13, color: Colors.cyanAccent),
                   const SizedBox(width: 4),
                   Text('Sending from your account email',
-                      style: TextStyle(color: Colors.cyanAccent.withAlpha(180),
-                          fontSize: 12)),
+                      style: TextStyle(
+                          color: Colors.cyanAccent.withAlpha(180), fontSize: 12)),
                 ]),
               ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
+            // Message → {{message}}
             GradientInputField(
               hintText: 'Describe your problem...',
               controller: _messageCtrl,
@@ -177,15 +219,17 @@ class _ContactScreenState extends State<ContactScreen> {
               ),
               child: Column(children: [
                 const Text('Feedback Email:',
-                    style: TextStyle(color: Colors.white, fontSize: 15,
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold)),
                 const SizedBox(height: 14),
                 Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   const Icon(Icons.email_rounded, color: Colors.cyan, size: 20),
                   const SizedBox(width: 8),
                   Text('arrowarawsipaglang@gmail.com',
-                      style: TextStyle(color: Colors.white.withAlpha(204),
-                          fontSize: 14)),
+                      style: TextStyle(
+                          color: Colors.white.withAlpha(204), fontSize: 14)),
                 ]),
               ]),
             ),

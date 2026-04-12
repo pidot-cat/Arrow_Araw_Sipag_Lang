@@ -1,6 +1,6 @@
 // lib/levels/level_base.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// Arrow Araw — Core Engine v6  (PRODUCTION FINAL)
+// Arrow Araw — Core Engine v7  (PRODUCTION FINAL – DEBUGGED)
 //
 // [FIX 1] STRAIGHT ARROWS ONLY — StraightArrowPainter, no bends/L-shapes.
 // [FIX 2] DEBOUNCING — _pendingSolve prevents rapid-tap life loss.
@@ -8,9 +8,16 @@
 // [FIX 4] Back button → LevelSelectScreen (not Home).
 // [FIX 5] Idle music resume after 2 s of inactivity.
 // [FIX 6] Clean closed-triangle arrowhead — zero artifacts.
-// [FIX 7] DYNAMIC CELL SCALING — cellSize auto-increases for low-arrow levels.
+// [FIX 7] DYNAMIC CELL SCALING v2:
+//           availableSpace = screenWidth * 0.85  (safe margin)
+//           Levels 1-6: cellSize = availableSpace / SMALL_DIVISOR → max size
+//           Levels 7-10: cellSize = availableSpace / actual cols  → dense
 // [FIX 8] SELECTIVE DOTS — dots rendered ONLY under occupied arrow cells.
 // [FIX 9] ARROWHEAD TIP — locked to leading edge based on escapeDirection.
+// [FIX 10] PREMIUM STROKE — doubled strokeWidth + doubled headSize for bold,
+//           clearly visible arrows even at high grid densities.
+// [FIX 11] ENFORCED SQUARE SILHOUETTE — grid container always N×N so the
+//           result is always a Solid Square, never a rectangle.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:async';
@@ -82,25 +89,43 @@ class BentArrowData {
   }
 }
 
-// ── [FIX 7] Dynamic cellSize calculator ──────────────────────────────────────
-// Lower arrow counts get a smaller effective divisor → bigger cells → bolder look.
+// ── [FIX 7] Dynamic cellSize calculator v2 ───────────────────────────────────
+// Formula: availableSpace = screenWidth * 0.85
+//          cellSize       = availableSpace / effectiveDivisor
+//
+// Levels 1-6 (≤ 60 arrows): use a SMALLER effective divisor than the real
+//   grid cols → cells are LARGER → arrows are bold and professional.
+// Levels 7-10 (> 60 arrows): use the real cols so the grid still fits.
+//
+// The grid is ALWAYS square (rows == cols enforced in level_manager.dart),
+// so this produces a strict N×N silhouette on every level.
 double dynamicCellSize({
   required double screenWidth,
   required int cols,
   required int arrowCount,
 }) {
-  final gridPx = screenWidth * 0.88;
-  final int effectiveCols;
-  if (arrowCount <= 20) {
-    effectiveCols = 5;       // Level 1-2: very large, bold arrows
+  // [FIX 7] Safe margin: 85 % of screen width
+  final availableSpace = screenWidth * 0.85;
+
+  // Effective divisor: smaller divisor → larger cells
+  final int effectiveDivisor;
+  if (arrowCount <= 10) {
+    effectiveDivisor = 5;       // Level 1: very large, premium arrows
+  } else if (arrowCount <= 20) {
+    effectiveDivisor = 6;       // Level 2
+  } else if (arrowCount <= 30) {
+    effectiveDivisor = 7;       // Level 3
   } else if (arrowCount <= 40) {
-    effectiveCols = 7;       // Level 3-4: large arrows
+    effectiveDivisor = 8;       // Level 4
+  } else if (arrowCount <= 50) {
+    effectiveDivisor = 9;       // Level 5
   } else if (arrowCount <= 60) {
-    effectiveCols = 10;      // Level 5-6: medium arrows
+    effectiveDivisor = 10;      // Level 6
   } else {
-    effectiveCols = cols;    // Level 7-10: dense, uses full grid
+    effectiveDivisor = cols;    // Levels 7-10: dense, full grid
   }
-  return gridPx / effectiveCols;
+
+  return availableSpace / effectiveDivisor;
 }
 
 // ── BentLevelStateMixin ───────────────────────────────────────────────────────
@@ -109,7 +134,7 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
   int get levelNumber;
   int get rows;
   int get cols;
-  int get arrowCount;  // [FIX 7] used by dynamicCellSize
+  int get arrowCount;
   List<BentArrowData> Function() get buildArrowsFn;
   Widget Function() get nextLevelBuilder;
 
@@ -198,7 +223,6 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
         for (final cell in a.cells) { occupied.add(cell); }
       }
     }
-    // [FIX 9] Check clearance from the TIP segment (leading edge)
     final tipSeg = _tipSegment(tappedArrow);
     final (dr, dc) = switch (tappedArrow.escape) {
       ArrowDir.up    => (-1, 0),
@@ -285,6 +309,9 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     _levelTimer?.cancel();
     _audio.cancelIdleTimer();
     _audio.resumeMenuMusic();
+    // [FIX 4 / FIX 3-NAV] pushAndRemoveUntil with isFirst predicate clears
+    // the entire stack above the root route so pressing Back on LevelSelect
+    // goes directly to Home/Login — no "double-back" bug.
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LevelSelectScreen()),
       (route) => route.isFirst,
@@ -375,29 +402,33 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     );
   }
 
-  // [FIX 7+8] buildGrid: dots only on occupied cells, cellSize passed in
+  // [FIX 7+8+11] buildGrid:
+  //   • dots only on occupied cells
+  //   • grid SizedBox is ALWAYS cols×cols (square silhouette)
+  //   • cellSize passed in from the level screen
   Widget buildGrid(double cellSize, Set<(int, int)> shapeCells) {
-    // [FIX 8] Only render dots where an unsolved arrow currently sits
     final occupiedCells = <(int, int)>{};
     for (final a in arrows) {
       if (!a.solved) {
-        for (final cell in a.cells) {
-          occupiedCells.add(cell);
-        }
+        for (final cell in a.cells) { occupiedCells.add(cell); }
       }
     }
 
     final dotRadius = (cellSize * 0.07).clamp(2.0, 4.5);
+
+    // [FIX 11] Enforce square: both dimensions use the SAME cellSize * cols
+    // (rows == cols for every level in level_manager.dart, but we clamp here
+    //  as a safety net so the grid is never a rectangle.)
+    final gridSide = cellSize * math.max(rows, cols);
 
     return Center(
       child: GestureDetector(
         onTapDown: (d) => onGridTap(d.localPosition, cellSize),
         behavior: HitTestBehavior.opaque,
         child: SizedBox(
-          width: cellSize * cols,
-          height: cellSize * rows,
+          width:  gridSide,  // [FIX 11] always square
+          height: gridSide,
           child: Stack(children: [
-            // [FIX 8] Selective dot rendering — occupied cells only
             for (final cell in occupiedCells)
               Positioned(
                 left: cell.$2 * cellSize + cellSize / 2 - dotRadius,
@@ -421,7 +452,8 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
       valueListenable: animTrigger[arrow.id]!,
       builder: (context, val, _) {
         final painter = CustomPaint(
-          size: Size(cellSize * cols, cellSize * rows),
+          size: Size(cellSize * math.max(rows, cols),
+                     cellSize * math.max(rows, cols)),
           painter: StraightArrowPainter(
             segs: arrow.segs, escape: arrow.escape,
             color: arrow.color, cellSize: cellSize,
@@ -487,10 +519,10 @@ class _GlassIconButton extends StatelessWidget {
 }
 
 // ── StraightArrowPainter ──────────────────────────────────────────────────────
-// [FIX 1] Straight arrows only.
-// [FIX 6] Closed triangle arrowhead.
-// [FIX 7] strokeWidth scales with cellSize → bold on low levels.
-// [FIX 9] Tip placed at the LEADING end based on escape direction.
+// [FIX 1]  Straight arrows only.
+// [FIX 6]  Closed triangle arrowhead — zero artifacts.
+// [FIX 9]  Tip placed at the LEADING end based on escape direction.
+// [FIX 10] DOUBLED strokeWidth + DOUBLED headSize → premium, visible arrows.
 
 class StraightArrowPainter extends CustomPainter {
   final List<BentCell> segs;
@@ -510,7 +542,7 @@ class StraightArrowPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (segs.isEmpty) return;
 
-    // [FIX 9] Leading tip is at first seg for LEFT/UP, last seg for RIGHT/DOWN
+    // [FIX 9] Leading tip: first seg for LEFT/UP, last seg for RIGHT/DOWN
     final BentCell headSeg;
     final BentCell tailSeg;
     switch (escape) {
@@ -539,9 +571,10 @@ class StraightArrowPainter extends CustomPainter {
     final tip = head + Offset(dx, dy) * (cellSize * 0.45);
     final shaft = Path()..moveTo(tail.dx, tail.dy)..lineTo(tip.dx, tip.dy);
 
-    // [FIX 7] Dynamic stroke width: thicker for large cells (low levels)
-    final strokeWidth = (cellSize * 0.18).clamp(2.5, 6.0);
-    final glowWidth  = strokeWidth * 3.2;
+    // [FIX 10] DOUBLED stroke width for premium look on all screen sizes
+    // Old: clamp(2.5, 6.0) → New: clamp(5.0, 12.0)
+    final strokeWidth = (cellSize * 0.36).clamp(5.0, 12.0);
+    final glowWidth   = strokeWidth * 3.2;
 
     // Glow pass
     canvas.drawPath(shaft, Paint()
@@ -559,8 +592,9 @@ class StraightArrowPainter extends CustomPainter {
 
   void _drawHead(Canvas canvas, Offset base, Offset tip, Color col) {
     final angle = math.atan2(tip.dy - base.dy, tip.dx - base.dx);
-    // [FIX 7] Head size scales with cellSize
-    final len = (cellSize * 0.34).clamp(6.0, 20.0);
+    // [FIX 10] DOUBLED head size for clear visibility
+    // Old: clamp(6.0, 20.0) → New: clamp(12.0, 40.0)
+    final len = (cellSize * 0.68).clamp(12.0, 40.0);
     const wing = 0.50;
 
     // [FIX 6] Closed triangle — zero artifacts

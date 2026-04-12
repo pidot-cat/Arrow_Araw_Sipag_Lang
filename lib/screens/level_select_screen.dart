@@ -9,6 +9,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
+// Audio service — needed to stop music before returning to Login
+import '../services/audio_service.dart';
+
 // Level screen imports — one per level
 import '../levels/game_screen_lvl_1.dart';
 import '../levels/game_screen_lvl_2.dart';
@@ -152,7 +155,16 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          // [FIX NAV] Stop all audio then pop back to Login/Home cleanly.
+          // Using pushNamedAndRemoveUntil clears the entire level/game stack,
+          // preventing the "double back" bug that exposed the login screen twice.
+          onPressed: () {
+            AudioService().stopAll();
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              '/home',
+              (route) => false, // remove ALL routes beneath
+            );
+          },
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),

@@ -41,7 +41,6 @@ import 'package:provider/provider.dart';
 import '../providers/game_provider.dart';
 import '../services/audio_service.dart';
 import '../services/level_unlock_service.dart';
-import '../utils/app_colors.dart';
 import '../screens/settings_screen.dart';
 
 // ── Direction enum ────────────────────────────────────────────────────────────

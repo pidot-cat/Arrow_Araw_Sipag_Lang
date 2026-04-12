@@ -9,26 +9,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
-  # State Management
   provider: ^6.0.5
-
-  # Shared Preferences for local storage
   shared_preferences: ^2.2.0
-
-  # Supabase for backend
   supabase_flutter: ^2.8.1
-
-  # Icons
   cupertino_icons: ^1.0.2
-
-  # HTTP client for EmailJS REST API calls (ContactScreen)
   http: ^1.2.0
-
-  # Audio
   audioplayers: ^6.6.0
-
-  # Animations
   flutter_animate: ^4.5.0
 
 dev_dependencies:
@@ -39,13 +25,12 @@ dev_dependencies:
 
 flutter_launcher_icons:
   android: true
-  image_path: "assets/images/MainLogo.jpg"
+  image_path: "assets/images/LOGO.png"
   adaptive_icon_background: "#000000"
-  adaptive_icon_foreground: "assets/images/MainLogo.jpg"
+  adaptive_icon_foreground: "assets/images/LOGO.png"
 
 flutter:
   uses-material-design: true
-
   assets:
     - assets/images/
-    - assets/sounds/
+    - assets/audio/

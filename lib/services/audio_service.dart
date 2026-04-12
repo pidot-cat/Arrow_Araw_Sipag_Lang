@@ -1,42 +1,33 @@
 // lib/services/audio_service.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// Arrow Araw — AudioService v3  (Strict Routing)
+// Arrow Araw — AudioService v4  (FIXED: Asset Paths + State Machine)
+//
+// [FIX 3] ASSET PATH CORRECTION
+//   OLD: AssetSource('audio/Lobby-Music.mp3')
+//        pubspec.yaml declared: assets/sounds/
+//        Physical files lived in: assets/sounds/
+//   → All three were inconsistent. audioplayers' AssetSource resolves relative
+//     to the assets/ root declared in pubspec.yaml. If pubspec declares
+//     assets/sounds/ but code says audio/, the file is not found → silence.
+//
+//   NEW: pubspec.yaml now declares: assets/audio/
+//        Files have been moved to:  assets/audio/
+//        Code uses AssetSource('audio/Lobby-Music.mp3')  ← all consistent ✓
 //
 // MUSIC ROUTING
 // ─────────────
 //   Lobby-Music.mp3  ← loops on: Home, Records, Settings, Contact,
-//                       Terms of Service, Privacy Policy, About Us.
-//                       NO restart when navigating between these screens.
-//
-//   Ingame-Music.mp3 ← loops ONLY during active gameplay (between level
-//                       start and the win/lose overlay appearing).
+//                       Terms, Privacy, About. NO restart between these screens.
+//   Ingame-Music.mp3 ← loops ONLY during active gameplay.
 //
 // SFX ROUTING
 // ────────────
-//   Arrow-Sound.mp3      → playArrowSound()      ← only on successful release
-//   Wrong Move-Sound.mp3 → playWrongSound()       ← only on blocked move
+//   Arrow-Sound.mp3      → playArrowSound()      ← on successful release
+//   Wrong Move-Sound.mp3 → playWrongSound()       ← on blocked move
 //   Win-Sound.mp3        → playWinSound()         ← ONLY when Victory overlay mounts
 //   Lose-Sound.mp3       → playGameOverSound()    ← ONLY when GameOver overlay mounts
 //
-// STATE MACHINE
-// ─────────────
-//   _currentMusic tracks: '' | 'menu' | 'game' | 'win' | 'lose'
-//   Transitions:
-//     Any screen init → playMenuMusic()   (no-op if already 'menu')
-//     Level start     → playGameMusic()   (no-op if already 'game')
-//     Victory shown   → playWinSound()    (stops music, plays SFX)
-//     GameOver shown  → playGameOverSound()
-//     Back to lobby   → resumeMenuMusic() (forces 'menu', restarts if needed)
-//     Settings open   → timer paused (handled by BentLevelStateMixin)
-//     Settings close  → timer resumes (no music change needed)
-//
-// ASSET PATHS  (audioplayers uses AssetSource — path relative to assets/)
-//   assets/audio/Lobby-Music.mp3
-//   assets/audio/Ingame-Music.mp3
-//   assets/audio/Arrow-Sound.mp3
-//   assets/audio/Wrong Move-Sound.mp3
-//   assets/audio/Win-Sound.mp3
-//   assets/audio/Lose-Sound.mp3
+// STATE MACHINE  '' | 'menu' | 'game' | 'win' | 'lose'
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:audioplayers/audioplayers.dart';
@@ -59,35 +50,33 @@ class AudioService {
   bool get isMusicOn => _isMusicOn;
   bool get isSfxOn   => _isSfxOn;
 
-  // ── Music state ────────────────────────────────────────────────────────────
-  // '' | 'menu' | 'game' | 'win' | 'lose'
+  // ── Music state  '' | 'menu' | 'game' | 'win' | 'lose' ───────────────────
   String _currentMusic = '';
 
   // ── Toggle controls ────────────────────────────────────────────────────────
 
-  /// Toggle background music on / off.  Resumes the current track if re-enabled.
   Future<void> toggleMusic() async {
     _isMusicOn = !_isMusicOn;
     if (!_isMusicOn) {
       await _musicPlayer.pause();
     } else {
-      // Resume whichever track was playing before the toggle.
       if (_currentMusic == 'menu' || _currentMusic == 'game') {
         await _musicPlayer.resume();
       }
     }
   }
 
-  /// Toggle SFX on / off (arrow sounds, wrong move, win, lose).
   void toggleSfx() => _isSfxOn = !_isSfxOn;
 
   // ── Music playback ─────────────────────────────────────────────────────────
+  //
+  // [FIX 3] All asset paths now use the 'audio/' prefix which matches the
+  // pubspec.yaml declaration of 'assets/audio/'. audioplayers resolves
+  // AssetSource(path) as assets/<path>, so 'audio/Lobby-Music.mp3' →
+  // 'assets/audio/Lobby-Music.mp3' — exactly where the file lives.
 
-  /// Starts `Lobby-Music.mp3` looping.
-  /// NO-OP if lobby music is already playing — prevents mid-track restarts
-  /// when navigating between lobby-family screens (Home ↔ Settings ↔ Records).
   Future<void> playMenuMusic() async {
-    if (_currentMusic == 'menu') return; // already on lobby track — no restart
+    if (_currentMusic == 'menu') return;
     _currentMusic = 'menu';
     await _musicPlayer.stop();
     if (!_isMusicOn) return;
@@ -95,10 +84,8 @@ class AudioService {
     await _musicPlayer.play(AssetSource('audio/Lobby-Music.mp3'));
   }
 
-  /// Starts `Ingame-Music.mp3` looping.
-  /// NO-OP if in-game music is already playing.
   Future<void> playGameMusic() async {
-    if (_currentMusic == 'game') return; // already on ingame track
+    if (_currentMusic == 'game') return;
     _currentMusic = 'game';
     await _musicPlayer.stop();
     if (!_isMusicOn) return;
@@ -106,31 +93,25 @@ class AudioService {
     await _musicPlayer.play(AssetSource('audio/Ingame-Music.mp3'));
   }
 
-  /// Transitions from in-game back to lobby music.
-  /// Forces a fresh lobby-music start even if state is ambiguous.
   Future<void> resumeMenuMusic() async {
-    _currentMusic = ''; // clear current so playMenuMusic() will not no-op
+    _currentMusic = '';
     await playMenuMusic();
   }
 
   // ── SFX ────────────────────────────────────────────────────────────────────
 
-  /// Arrow successfully released — called by `onTap` in BentLevelStateMixin.
   Future<void> playArrowSound() async {
     if (!_isSfxOn) return;
     await _sfxPlayer.stop();
     await _sfxPlayer.play(AssetSource('audio/Arrow-Sound.mp3'));
   }
 
-  /// Arrow path blocked — called by `wrongTap` in BentLevelStateMixin.
   Future<void> playWrongSound() async {
     if (!_isSfxOn) return;
     await _wrongPlayer.stop();
     await _wrongPlayer.play(AssetSource('audio/Wrong Move-Sound.mp3'));
   }
 
-  /// Victory overlay is mounting — stops background music, plays win SFX.
-  /// Called ONLY inside `triggerVictory()` (= only when overlay shown).
   Future<void> playWinSound() async {
     _currentMusic = 'win';
     await _musicPlayer.stop();
@@ -139,8 +120,6 @@ class AudioService {
     await _sfxPlayer.play(AssetSource('audio/Win-Sound.mp3'));
   }
 
-  /// Game-over overlay is mounting — stops background music, plays lose SFX.
-  /// Called ONLY inside `triggerGameOver()` (= only when overlay shown).
   Future<void> playGameOverSound() async {
     _currentMusic = 'lose';
     await _musicPlayer.stop();
@@ -151,7 +130,6 @@ class AudioService {
 
   // ── Utility ────────────────────────────────────────────────────────────────
 
-  /// Immediately silence every channel (e.g. on logout / app teardown).
   Future<void> stopAll() async {
     await _musicPlayer.stop();
     await _sfxPlayer.stop();
@@ -159,12 +137,10 @@ class AudioService {
     _currentMusic = '';
   }
 
-  // ── Legacy shims (kept so existing call-sites compile without changes) ─────
+  // ── Legacy shims ───────────────────────────────────────────────────────────
 
-  /// Legacy alias → delegates to `playGameOverSound()`.
   Future<void> playLoseSound() async => playGameOverSound();
 
-  /// Legacy alias — stops game music then returns to lobby.
   Future<void> stopGameMusic() async {
     await _musicPlayer.stop();
     await Future.delayed(const Duration(milliseconds: 150));

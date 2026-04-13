@@ -136,7 +136,10 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
           onPressed: () {
-            AudioService().stopAll();
+            // Use resumeMenuMusic() instead of stopAll() so lobby music
+            // transitions seamlessly. stopAll() cleared _currentMusic which
+            // caused a brief silence before HomeScreen re-triggered playback.
+            AudioService().resumeMenuMusic();
             Navigator.of(context).pushNamedAndRemoveUntil(
               '/home',
               (route) => false,

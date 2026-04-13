@@ -1,12 +1,14 @@
 // lib/services/audio_service.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// Arrow Araw — AudioService v8  (PRODUCTION FINAL — Fix 4 Applied)
+// Arrow Araw — AudioService v9  (PRODUCTION FINAL — Fix 5 Applied)
 //
-// FIX-3b v2 TOGGLE RESUME: toggleMusic() now uses seek(0)+resume() instead of
-//         stop()+play() when toggling ON for lobby music. Avoids an Android race
-//         condition where stop() immediately followed by play() can produce silence.
-//         Falls back to a clean playMenuMusic() restart if resume throws (stopped).
-//         Also handles the edge case where _currentMusic is empty on toggle ON.
+// FIX-3b v3 TOGGLE RESUME: toggleMusic() now uses plain resume() when toggling
+//         ON. The previous v2 implementation called seek(Duration.zero) before
+//         resume(), which restarted the track from second zero — the exact
+//         behaviour the bug report flagged. Removing seek() means the player
+//         resumes from the position it was paused at, delivering true seamless
+//         continuation. A catchError() fallback restarts the correct track if the
+//         OS killed the player session while it was paused.
 //
 // FIX-3c v2 LIFECYCLE: didChangeAppLifecycleState now pauses on 'inactive' state
 //         in addition to paused/detached/hidden — covers notification shade and
@@ -101,33 +103,33 @@ class AudioService with WidgetsBindingObserver {
         _musicPlayer.resume().catchError((_) {
           final track = _currentMusic;
           _currentMusic = ''; // clear guard to allow restart
-          if (track == 'menu')
+          if (track == 'menu') {
             playMenuMusic();
-          else if (track == 'game') playGameMusic();
+          } else if (track == 'game') {
+            playGameMusic();
+          }
         });
       }
     }
   }
 
-  // ── Toggle controls (FIX-3b v2) ───────────────────────────────────────────────
+  // ── Toggle controls (FIX-3b v3) ───────────────────────────────────────────────
   Future<void> toggleMusic() async {
     _isMusicOn = !_isMusicOn;
     if (!_isMusicOn) {
       await _musicPlayer.pause();
     } else {
       if (_currentMusic == 'menu') {
-        // FIX-3b v2: Prefer seek(0)+resume over stop+play to avoid an Android
-        // race condition where stop() immediately followed by play() can produce
-        // a brief silence or no audio at all on certain audioplayers versions.
-        // If the player was already stopped (not just paused), the catchError
-        // fallback performs a clean restart via playMenuMusic().
-        try {
-          await _musicPlayer.seek(Duration.zero);
-          await _musicPlayer.resume();
-        } catch (_) {
+        // FIX-3b v3: Call resume() directly — no seek(). The previous v2
+        // implementation called seek(Duration.zero) before resume(), which
+        // restarted the lobby track from second zero on every toggle-ON.
+        // Plain resume() returns to the exact position the track was paused at,
+        // delivering true seamless continuation of the loop. If the player was
+        // stopped (OS killed the session), catchError restarts it from scratch.
+        _musicPlayer.resume().catchError((_) {
           _currentMusic = '';
-          await playMenuMusic();
-        }
+          playMenuMusic();
+        });
       } else if (_currentMusic == 'game') {
         // Game music: player was only paused — resume is safe.
         await _musicPlayer.resume();

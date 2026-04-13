@@ -11,6 +11,12 @@
 //     observer here caused it to call playMenuMusic() unconditionally on resume
 //     even while an in-game screen was in the foreground, overriding game music.
 //
+// FIX-3d LEVEL SELECT RETURN: Navigator.push to LevelSelectScreen now has a
+//   .then() callback that calls resumeMenuMusic() when the user returns via
+//   the system back button. Without this, HomeScreen.initState() does not
+//   re-fire on return (the screen was never disposed), so the lobby music
+//   would remain silent after backing out of the level select grid.
+//
 // [FIX NAV] PopScope(canPop: false) — system back button disabled on Home.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -94,7 +100,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         MaterialPageRoute(
                           builder: (_) => const LevelSelectScreen(),
                         ),
-                      );
+                      ).then((_) {
+                        // FIX-3d: initState() does not re-fire when returning
+                        // to an already-mounted screen via system back. Explicitly
+                        // resume lobby music here so it plays seamlessly after the
+                        // user backs out of the Level Select screen.
+                        if (mounted) _audioService.resumeMenuMusic();
+                      });
                     },
                   ),
                   SizedBox(height: size.height * 0.022),

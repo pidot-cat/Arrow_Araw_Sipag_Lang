@@ -1,18 +1,18 @@
 // lib/services/audio_service.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// Arrow Araw — AudioService v7  (PRODUCTION FINAL — Fix 3 Applied)
+// Arrow Araw — AudioService v8  (PRODUCTION FINAL — Fix 4 Applied)
 //
-// FIX-3b TOGGLE RESUME: toggleMusic() now force-restarts the menu player when
-//         it was previously stopped (not just paused). AudioPlayer.resume() is
-//         a no-op on a stopped player, so toggling Off→On in Settings used to
-//         produce silence. Fixed by clearing the guard and calling playMenuMusic
-//         or resuming game music as appropriate.
+// FIX-3b v2 TOGGLE RESUME: toggleMusic() now uses seek(0)+resume() instead of
+//         stop()+play() when toggling ON for lobby music. Avoids an Android race
+//         condition where stop() immediately followed by play() can produce silence.
+//         Falls back to a clean playMenuMusic() restart if resume throws (stopped).
+//         Also handles the edge case where _currentMusic is empty on toggle ON.
 //
-// FIX-3c LIFECYCLE PAUSE (not stop): didChangeAppLifecycleState now PAUSES
-//         (not stops) audio on background so _currentMusic state is preserved.
-//         On resume it restores whichever track was active — lobby OR game.
-//         Previously, stopping cleared _currentMusic and always restarted
-//         lobby music when the app foregrounded during a game session.
+// FIX-3c v2 LIFECYCLE: didChangeAppLifecycleState now pauses on 'inactive' state
+//         in addition to paused/detached/hidden — covers notification shade and
+//         incoming call overlay. Resume path adds .catchError() fallback: if the
+//         OS killed the AudioPlayer session while backgrounded, it force-restarts
+//         the correct track instead of silently failing.
 //
 // WIN-DEBOUNCE  playWinSound() guarded by _winSoundPlayed; reset by
 //               resetWinSoundGuard() from restart() / initLevelState().
@@ -34,14 +34,14 @@ class AudioService with WidgetsBindingObserver {
 
   // ── Players ────────────────────────────────────────────────────────────────
   final AudioPlayer _musicPlayer = AudioPlayer();
-  final AudioPlayer _sfxPlayer   = AudioPlayer();
+  final AudioPlayer _sfxPlayer = AudioPlayer();
   final AudioPlayer _wrongPlayer = AudioPlayer();
 
   // ── Settings ───────────────────────────────────────────────────────────────
   bool _isMusicOn = true;
-  bool _isSfxOn   = true;
+  bool _isSfxOn = true;
   bool get isMusicOn => _isMusicOn;
-  bool get isSfxOn   => _isSfxOn;
+  bool get isSfxOn => _isSfxOn;
 
   // ── State: '' | 'menu' | 'game' | 'win' | 'lose' ─────────────────────────
   String _currentMusic = '';
@@ -68,7 +68,7 @@ class AudioService with WidgetsBindingObserver {
     await _musicPlayer.resume();
   }
 
-  // ── AppLifecycle observer (FIX-3c) ────────────────────────────────────────
+  // ── AppLifecycle observer (FIX-3c v2) ─────────────────────────────────────
   bool _observerAttached = false;
 
   void attachLifecycleObserver() {
@@ -79,41 +79,63 @@ class AudioService with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused   ||
+    if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
-        state == AppLifecycleState.hidden) {
-      // FIX-3c: PAUSE (not stop) so _currentMusic is preserved for resume.
-      // Stopping resets the player and forgets which track was playing,
-      // causing lobby music to play when returning from an in-game session.
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.inactive) {
+      // FIX-3c v2: PAUSE on ALL non-foreground states including 'inactive'
+      // (notification shade, incoming call overlay, app switcher). This stops
+      // music leaking through OS interruptions while keeping _currentMusic
+      // intact so the correct track resumes when the user returns.
       _musicPlayer.pause();
       _sfxPlayer.stop();
       _wrongPlayer.stop();
       cancelIdleTimer();
     }
     if (state == AppLifecycleState.resumed && _isMusicOn) {
-      // FIX-3c: Resume whichever track was active — lobby OR in-game.
+      // FIX-3c v2: Try resume() first. On some Android devices the OS kills
+      // the AudioPlayer session while backgrounded. If resume() throws
+      // (stopped/disposed player), fall back to a full restart of whichever
+      // track was active before backgrounding — preserving music continuity.
       if (_currentMusic == 'menu' || _currentMusic == 'game') {
-        _musicPlayer.resume();
+        _musicPlayer.resume().catchError((_) {
+          final track = _currentMusic;
+          _currentMusic = ''; // clear guard to allow restart
+          if (track == 'menu')
+            playMenuMusic();
+          else if (track == 'game') playGameMusic();
+        });
       }
     }
   }
 
-  // ── Toggle controls (FIX-3b) ───────────────────────────────────────────────
+  // ── Toggle controls (FIX-3b v2) ───────────────────────────────────────────────
   Future<void> toggleMusic() async {
     _isMusicOn = !_isMusicOn;
     if (!_isMusicOn) {
       await _musicPlayer.pause();
     } else {
-      // FIX-3b: AudioPlayer.resume() is a no-op when the player has been
-      // stopped (e.g. after navigating away and back). Force-restart the
-      // appropriate track so the toggle reliably resumes audio.
       if (_currentMusic == 'menu') {
-        // Clear guard so playMenuMusic re-starts rather than early-returning.
+        // FIX-3b v2: Prefer seek(0)+resume over stop+play to avoid an Android
+        // race condition where stop() immediately followed by play() can produce
+        // a brief silence or no audio at all on certain audioplayers versions.
+        // If the player was already stopped (not just paused), the catchError
+        // fallback performs a clean restart via playMenuMusic().
+        try {
+          await _musicPlayer.seek(Duration.zero);
+          await _musicPlayer.resume();
+        } catch (_) {
+          _currentMusic = '';
+          await playMenuMusic();
+        }
+      } else if (_currentMusic == 'game') {
+        // Game music: player was only paused — resume is safe.
+        await _musicPlayer.resume();
+      } else {
+        // No track was active (e.g. toggled off before any music started).
+        // Default to lobby music so the user hears something immediately.
         _currentMusic = '';
         await playMenuMusic();
-      } else if (_currentMusic == 'game') {
-        // Game music uses a looping player that was only paused — resume works.
-        await _musicPlayer.resume();
       }
     }
   }
@@ -191,8 +213,8 @@ class AudioService with WidgetsBindingObserver {
   }
 
   // ── Legacy shims ───────────────────────────────────────────────────────────
-  Future<void> playLoseSound()  async => playGameOverSound();
-  Future<void> stopGameMusic()  async {
+  Future<void> playLoseSound() async => playGameOverSound();
+  Future<void> stopGameMusic() async {
     await _musicPlayer.stop();
     await Future.delayed(const Duration(milliseconds: 150));
     await resumeMenuMusic();

@@ -1,9 +1,17 @@
 // lib/screens/home_screen.dart
 // ─────────────────────────────────────────────────────────────────────────────
+// FIX-3a LOBBY MUSIC ON LAUNCH:
+//   • initState() calls resumeMenuMusic() (not playMenuMusic()) so that
+//     lobby music starts on FIRST launch as well as on return from a game.
+//     resumeMenuMusic() clears the early-return guard before playing, so it
+//     always restarts the track regardless of prior state.
+//   • WidgetsBindingObserver is REMOVED from HomeScreen. The AudioService
+//     singleton already registers its own observer via attachLifecycleObserver()
+//     and handles foreground/background transitions globally. Having a second
+//     observer here caused it to call playMenuMusic() unconditionally on resume
+//     even while an in-game screen was in the foreground, overriding game music.
+//
 // [FIX NAV] PopScope(canPop: false) — system back button disabled on Home.
-//           Users cannot press back to return to the Login screen.
-// [FIX AUDIO] WidgetsBindingObserver — Lobby-Music auto-resumes when the app
-//           returns to the foreground while on this screen.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
@@ -22,33 +30,19 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen> {
   final AudioService _audioService = AudioService();
 
   @override
   void initState() {
     super.initState();
-    // Register lifecycle observer for lobby music auto-resume
-    WidgetsBinding.instance.addObserver(this);
-    // Start lobby music after first frame
+    // FIX-3a: resumeMenuMusic() clears the early-return guard before playing,
+    // ensuring lobby music starts on first launch AND on return from a level.
+    // Using playMenuMusic() would silently no-op if _currentMusic was already
+    // 'menu' (e.g. from a previous navigation), missing the first-launch case.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _audioService.playMenuMusic();
+      _audioService.resumeMenuMusic();
     });
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  // [FIX AUDIO] Auto-resume Lobby-Music when app returns to foreground
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // Only resume if we're still in the menu/lobby context
-      _audioService.playMenuMusic();
-    }
   }
 
   @override

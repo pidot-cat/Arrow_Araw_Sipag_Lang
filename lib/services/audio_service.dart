@@ -1,24 +1,25 @@
 // lib/services/audio_service.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// Arrow Araw — AudioService v6  (PRODUCTION FINAL)
+// Arrow Araw — AudioService v7  (PRODUCTION FINAL — Fix 3 Applied)
 //
-// WIN-DEBOUNCE: playWinSound() is guarded by _winSoundPlayed boolean.
-//   The flag is cleared only by resetWinSoundGuard() which is called from
-//   restart() and initLevelState() — so the win sound fires EXACTLY ONCE
-//   per level completion, even if triggerVictory() is called from multiple
-//   simultaneous Future.delayed callbacks.
+// FIX-3b TOGGLE RESUME: toggleMusic() now force-restarts the menu player when
+//         it was previously stopped (not just paused). AudioPlayer.resume() is
+//         a no-op on a stopped player, so toggling Off→On in Settings used to
+//         produce silence. Fixed by clearing the guard and calling playMenuMusic
+//         or resuming game music as appropriate.
 //
-// LOBBY-MUSIC: playMenuMusic() is called from HomeScreen.initState() via
-//   addPostFrameCallback. The AudioService singleton ensures a second call
-//   while 'menu' is already playing is a no-op (early return guard).
-//   resumeMenuMusic() forces a re-play (e.g. when returning from a game).
+// FIX-3c LIFECYCLE PAUSE (not stop): didChangeAppLifecycleState now PAUSES
+//         (not stops) audio on background so _currentMusic state is preserved.
+//         On resume it restores whichever track was active — lobby OR game.
+//         Previously, stopping cleared _currentMusic and always restarted
+//         lobby music when the app foregrounded during a game session.
 //
-// [FIX A] IDLE MUSIC RESUME — startIdleResumeTimer() resets 2-second
-//         countdown on every tap; resumes game music after idle period.
-// [FIX B] APP LIFECYCLE — WidgetsBindingObserver hard-stops all audio
-//         when app is paused/detached/hidden.
-// [FIX C] MUSIC NEVER CUTS ON TAP — SFX players are separate from
-//         _musicPlayer.
+// WIN-DEBOUNCE  playWinSound() guarded by _winSoundPlayed; reset by
+//               resetWinSoundGuard() from restart() / initLevelState().
+// LOBBY-MUSIC   playMenuMusic() early-return guard (no-op on second call).
+//               resumeMenuMusic() force-restarts regardless of guard.
+// FIX-A         startIdleResumeTimer() — 2s idle → resume game music.
+// FIX-C         SFX players are separate from _musicPlayer.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:async';
@@ -45,14 +46,11 @@ class AudioService with WidgetsBindingObserver {
   // ── State: '' | 'menu' | 'game' | 'win' | 'lose' ─────────────────────────
   String _currentMusic = '';
 
-  // WIN-DEBOUNCE: Prevents multiple win-sound triggers in one level.
+  // WIN-DEBOUNCE
   bool _winSoundPlayed = false;
-
-  /// Call from restart() and initLevelState() to reset the win-sound guard
-  /// for the new level attempt.
   void resetWinSoundGuard() => _winSoundPlayed = false;
 
-  // ── [FIX A] Idle resume timer ──────────────────────────────────────────────
+  // ── Idle resume timer (FIX-A) ─────────────────────────────────────────────
   Timer? _idleTimer;
 
   void startIdleResumeTimer() {
@@ -70,7 +68,7 @@ class AudioService with WidgetsBindingObserver {
     await _musicPlayer.resume();
   }
 
-  // ── [FIX B] AppLifecycle hard stop ────────────────────────────────────────
+  // ── AppLifecycle observer (FIX-3c) ────────────────────────────────────────
   bool _observerAttached = false;
 
   void attachLifecycleObserver() {
@@ -84,20 +82,37 @@ class AudioService with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused   ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
-      stopAll();
+      // FIX-3c: PAUSE (not stop) so _currentMusic is preserved for resume.
+      // Stopping resets the player and forgets which track was playing,
+      // causing lobby music to play when returning from an in-game session.
+      _musicPlayer.pause();
+      _sfxPlayer.stop();
+      _wrongPlayer.stop();
+      cancelIdleTimer();
     }
-    if (state == AppLifecycleState.resumed) {
-      if (_currentMusic == 'menu' && _isMusicOn) _musicPlayer.resume();
+    if (state == AppLifecycleState.resumed && _isMusicOn) {
+      // FIX-3c: Resume whichever track was active — lobby OR in-game.
+      if (_currentMusic == 'menu' || _currentMusic == 'game') {
+        _musicPlayer.resume();
+      }
     }
   }
 
-  // ── Toggle controls ────────────────────────────────────────────────────────
+  // ── Toggle controls (FIX-3b) ───────────────────────────────────────────────
   Future<void> toggleMusic() async {
     _isMusicOn = !_isMusicOn;
     if (!_isMusicOn) {
       await _musicPlayer.pause();
     } else {
-      if (_currentMusic == 'menu' || _currentMusic == 'game') {
+      // FIX-3b: AudioPlayer.resume() is a no-op when the player has been
+      // stopped (e.g. after navigating away and back). Force-restart the
+      // appropriate track so the toggle reliably resumes audio.
+      if (_currentMusic == 'menu') {
+        // Clear guard so playMenuMusic re-starts rather than early-returning.
+        _currentMusic = '';
+        await playMenuMusic();
+      } else if (_currentMusic == 'game') {
+        // Game music uses a looping player that was only paused — resume works.
         await _musicPlayer.resume();
       }
     }
@@ -107,10 +122,8 @@ class AudioService with WidgetsBindingObserver {
 
   // ── Music playback ─────────────────────────────────────────────────────────
 
-  // LOBBY-MUSIC: Early-return guard ensures a second call from HomeScreen
-  // while lobby music is already playing is a no-op.
   Future<void> playMenuMusic() async {
-    if (_currentMusic == 'menu') return;
+    if (_currentMusic == 'menu') return; // early-return guard (no-op)
     _currentMusic = 'menu';
     await _musicPlayer.stop();
     if (!_isMusicOn) return;
@@ -127,14 +140,15 @@ class AudioService with WidgetsBindingObserver {
     await _musicPlayer.play(AssetSource('audio/Ingame-Music.mp3'));
   }
 
-  // Forces lobby music to restart even if it was already playing.
-  // Use when returning to HomeScreen from a game session.
+  /// Force lobby music to restart even if already playing.
+  /// Call when returning to HomeScreen from a game session.
   Future<void> resumeMenuMusic() async {
     _currentMusic = ''; // clear guard so playMenuMusic re-starts
     await playMenuMusic();
   }
 
-  // ── SFX — [FIX C] never touch _musicPlayer ────────────────────────────────
+  // ── SFX — separate players; never touch _musicPlayer ─────────────────────
+
   Future<void> playArrowSound() async {
     if (!_isSfxOn) return;
     await _sfxPlayer.stop();
@@ -147,10 +161,8 @@ class AudioService with WidgetsBindingObserver {
     await _wrongPlayer.play(AssetSource('audio/Wrong Move-Sound.mp3'));
   }
 
-  // WIN-DEBOUNCE: Plays exactly once per level. Guard reset by
-  // resetWinSoundGuard() at level start / restart.
   Future<void> playWinSound() async {
-    if (_winSoundPlayed) return; // debounce — ignore duplicate calls
+    if (_winSoundPlayed) return;
     _winSoundPlayed = true;
     _currentMusic = 'win';
     cancelIdleTimer();

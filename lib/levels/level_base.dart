@@ -1,19 +1,18 @@
 // lib/levels/level_base.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// Arrow Araw — Core Engine v9  (PRODUCTION FINAL)
+// Arrow Araw — Core Engine v10  (PRODUCTION FINAL — All Fixes Applied)
 //
-// PERF-1  RepaintBoundary wraps EACH arrow → only the animating arrow
-//         repaints; the static grid never repaints during animation cycles.
-// PERF-2  Static dot grid drawn in its own RepaintBoundary (_DotGridPainter)
-//         and never rebuilt during animation.
-// PERF-3  willChange=false on idle painters; true only on animating arrow
-//         to opt it into a dedicated GPU compositing layer.
-// PERF-4  shouldRepaint compares segs by value (not just length).
-// PERF-5  onGridTap debounced: taps within 16 ms are ignored (1-frame guard)
-//         to prevent ghost life deductions from rapid input.
-// WIN-1   _victoryTriggered boolean: triggerVictory() + win sound fire
-//         exactly ONCE per level regardless of simultaneous callbacks.
-// HEAD-1  Arrowhead apex correctly placed at the OUTER EDGE of the head cell.
+// FIX-1  HEAD-ALIGN: Shaft endpoint pulled back by halfCap so StrokeCap.round
+//        meets the arrowhead apex flush — no gap anywhere.
+// FIX-2  PERF-6: Adaptive animation durations for levels 5–10.
+//          L5–L7 (50–70 arrows): 280ms slide / 120ms fade delay / 300ms solve
+//          L8–L10 (80–100 arrows): 220ms slide / 90ms fade delay / 240ms solve
+// FIX-3  (Audio — see audio_service.dart and home_screen.dart)
+// FIX-4  PERF-7: Per-arrow debounce map replaces global 16ms gate.
+//        Rapid taps on DIFFERENT arrows all register correctly.
+//
+// Retained from v9: PERF-1 (RepaintBoundary/arrow), PERF-2 (dot grid),
+//   PERF-3 (willChange), PERF-4 (shouldRepaint value-compare), WIN-1.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:async';
@@ -119,12 +118,27 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
   final AudioService _audio = AudioService();
   final Set<int> _pendingSolve = {};
 
-  // PERF-5: Rapid-tap debounce timestamp.
-  DateTime? _lastTapTime;
+  // FIX-4 / PERF-7: Per-arrow debounce map.
+  // Each arrow tracks its own last-tap timestamp so rapid taps on DIFFERENT
+  // arrows all register. Only a double-tap on the SAME arrow within 16ms
+  // (one frame) is suppressed to prevent ghost life deductions.
+  final Map<int, DateTime> _lastTapPerArrow = {};
+
+  bool _debounceCheckArrow(int arrowId) {
+    final now = DateTime.now();
+    final last = _lastTapPerArrow[arrowId];
+    if (last != null &&
+        now.difference(last) < const Duration(milliseconds: 16)) {
+      return false;
+    }
+    _lastTapPerArrow[arrowId] = now;
+    return true;
+  }
 
   void initLevelState() {
     _victoryTriggered = false;
-    _audio.resetWinSoundGuard(); // WIN-DEBOUNCE: fresh guard for this level
+    _lastTapPerArrow.clear();
+    _audio.resetWinSoundGuard();
     arrows = buildArrowsFn();
     for (final a in arrows) {
       animTrigger[a.id] = ValueNotifier(0);
@@ -137,7 +151,9 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
   void dispose() {
     _levelTimer?.cancel();
     _audio.cancelIdleTimer();
-    for (final v in animTrigger.values) { v.dispose(); }
+    for (final v in animTrigger.values) {
+      v.dispose();
+    }
     super.dispose();
   }
 
@@ -197,21 +213,24 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     final occupied = <(int, int)>{};
     for (final a in arrows) {
       if (a.id != tappedArrow.id && !a.solved) {
-        for (final cell in a.cells) { occupied.add(cell); }
+        for (final cell in a.cells) {
+          occupied.add(cell);
+        }
       }
     }
     final tipSeg = _headSeg(tappedArrow);
     final (dr, dc) = switch (tappedArrow.escape) {
-      ArrowDir.up    => (-1, 0),
-      ArrowDir.down  => (1,  0),
-      ArrowDir.left  => (0, -1),
-      ArrowDir.right => (0,  1),
+      ArrowDir.up => (-1, 0),
+      ArrowDir.down => (1, 0),
+      ArrowDir.left => (0, -1),
+      ArrowDir.right => (0, 1),
     };
     var r = tipSeg.row + dr;
     var c = tipSeg.col + dc;
     while (r >= 0 && r < rows && c >= 0 && c < cols) {
       if (occupied.contains((r, c))) return false;
-      r += dr; c += dc;
+      r += dr;
+      c += dc;
     }
     return true;
   }
@@ -226,60 +245,91 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     return null;
   }
 
-  // PERF-5: Ignore taps within one frame of the previous tap.
-  bool _debounceCheck() {
-    final now = DateTime.now();
-    if (_lastTapTime != null &&
-        now.difference(_lastTapTime!) < const Duration(milliseconds: 16)) {
-      return false;
-    }
-    _lastTapTime = now;
-    return true;
+  // FIX-2 / PERF-6: Adaptive animation & solve-delay timings.
+  Duration get _slideDuration {
+    if (arrowCount >= 80) return const Duration(milliseconds: 220);
+    if (arrowCount >= 50) return const Duration(milliseconds: 280);
+    return const Duration(milliseconds: 350);
+  }
+
+  Duration get _fadeDelay {
+    if (arrowCount >= 80) return const Duration(milliseconds: 90);
+    if (arrowCount >= 50) return const Duration(milliseconds: 120);
+    return const Duration(milliseconds: 160);
+  }
+
+  Duration get _fadeDuration {
+    if (arrowCount >= 80) return const Duration(milliseconds: 130);
+    if (arrowCount >= 50) return const Duration(milliseconds: 160);
+    return const Duration(milliseconds: 190);
+  }
+
+  // Solve-completion Future fires after slide finishes, not a hardcoded 380ms.
+  Duration get _solveDelay {
+    if (arrowCount >= 80) return const Duration(milliseconds: 240);
+    if (arrowCount >= 50) return const Duration(milliseconds: 300);
+    return const Duration(milliseconds: 380);
   }
 
   void onGridTap(Offset localPos, double cellSize) {
     if (gameOver || victory) return;
-    if (!_debounceCheck()) return; // PERF-5
     _audio.startIdleResumeTimer();
 
     final arrow = _findTappedArrow(localPos, cellSize);
     if (arrow == null) return;
 
-    if (!isPathClear(arrow)) { wrongTap(); return; }
+    // FIX-4: Per-arrow debounce — only blocks same-arrow double-tap.
+    if (!_debounceCheckArrow(arrow.id)) return;
+
+    if (!isPathClear(arrow)) {
+      wrongTap();
+      return;
+    }
 
     _audio.playArrowSound();
     _pendingSolve.add(arrow.id);
     arrow.solved = true;
     animTrigger[arrow.id]!.value++;
 
-    Future.delayed(const Duration(milliseconds: 380), () {
+    Future.delayed(_solveDelay, () {
       if (!mounted) return;
       _pendingSolve.remove(arrow.id);
-      setState(() { if (arrows.every((a) => a.solved)) triggerVictory(); });
+      setState(() {
+        if (arrows.every((a) => a.solved)) triggerVictory();
+      });
     });
   }
 
   void onTap(BentArrowData arrow) {
     if (gameOver || victory || arrow.solved) return;
     if (_pendingSolve.contains(arrow.id)) return;
-    if (!_debounceCheck()) return; // PERF-5
+    // FIX-4: Per-arrow debounce.
+    if (!_debounceCheckArrow(arrow.id)) return;
     _audio.startIdleResumeTimer();
-    if (!isPathClear(arrow)) { wrongTap(); return; }
+    if (!isPathClear(arrow)) {
+      wrongTap();
+      return;
+    }
     _audio.playArrowSound();
     _pendingSolve.add(arrow.id);
     arrow.solved = true;
     animTrigger[arrow.id]!.value++;
-    Future.delayed(const Duration(milliseconds: 380), () {
+    Future.delayed(_solveDelay, () {
       if (!mounted) return;
       _pendingSolve.remove(arrow.id);
-      setState(() { if (arrows.every((a) => a.solved)) triggerVictory(); });
+      setState(() {
+        if (arrows.every((a) => a.solved)) triggerVictory();
+      });
     });
   }
 
   void wrongTap() {
     _audio.playWrongSound();
     _audio.startIdleResumeTimer();
-    setState(() { lives--; if (lives <= 0) triggerGameOver(); });
+    setState(() {
+      lives--;
+      if (lives <= 0) triggerGameOver();
+    });
   }
 
   void restart() {
@@ -287,12 +337,17 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     _audio.cancelIdleTimer();
     _pendingSolve.clear();
     _victoryTriggered = false;
-    _lastTapTime = null;
-    _audio.resetWinSoundGuard(); // WIN-DEBOUNCE: reset for new attempt
+    _lastTapPerArrow.clear(); // FIX-4: reset per-arrow debounce
+    _audio.resetWinSoundGuard();
     setState(() {
       arrows = buildArrowsFn();
-      lives = 3; secondsLeft = 60; gameOver = false; victory = false;
-      for (final a in arrows) { animTrigger[a.id]?.value = 0; }
+      lives = 3;
+      secondsLeft = 60;
+      gameOver = false;
+      victory = false;
+      for (final a in arrows) {
+        animTrigger[a.id]?.value = 0;
+      }
     });
     _audio.playGameMusic();
     _startTimer();
@@ -320,7 +375,9 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     _audio.cancelIdleTimer();
     Navigator.push(context,
             MaterialPageRoute(builder: (_) => const SettingsScreen()))
-        .then((_) { if (!gameOver && !victory && mounted) _startTimer(); });
+        .then((_) {
+      if (!gameOver && !victory && mounted) _startTimer();
+    });
   }
 
   Widget buildHUD() {
@@ -334,7 +391,9 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
         color: Colors.white.withAlpha(10),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withAlpha(22)),
-        boxShadow: [BoxShadow(color: Colors.cyanAccent.withAlpha(15), blurRadius: 14)],
+        boxShadow: [
+          BoxShadow(color: Colors.cyanAccent.withAlpha(15), blurRadius: 14)
+        ],
       ),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Row(children: [
@@ -346,8 +405,10 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
           const SizedBox(width: 8),
           Text('Level $levelNumber',
               style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold,
-                  fontSize: 15, letterSpacing: 1.2,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  letterSpacing: 1.2,
                   shadows: [Shadow(color: Colors.cyanAccent, blurRadius: 8)])),
           const Spacer(),
           Row(children: List.generate(3, (i) {
@@ -355,12 +416,15 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2),
               child: Image.asset(
-                alive ? 'assets/images/heart icon Red.png'
-                      : 'assets/images/heart icon Black.png',
-                width: 24, height: 24,
+                alive
+                    ? 'assets/images/heart icon Red.png'
+                    : 'assets/images/heart icon Black.png',
+                width: 24,
+                height: 24,
                 errorBuilder: (_, __, ___) => Icon(
-                  alive ? Icons.favorite : Icons.favorite_border,
-                  color: alive ? Colors.redAccent : Colors.white24, size: 20),
+                    alive ? Icons.favorite : Icons.favorite_border,
+                    color: alive ? Colors.redAccent : Colors.white24,
+                    size: 20),
               ),
             );
           })),
@@ -368,7 +432,8 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
           AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 200),
             style: TextStyle(
-                color: timerColor, fontSize: isUrgent ? 22 : 18,
+                color: timerColor,
+                fontSize: isUrgent ? 22 : 18,
                 fontWeight: FontWeight.bold,
                 shadows: [Shadow(color: timerColor, blurRadius: 10)]),
             child: Text('${secondsLeft}s'),
@@ -383,7 +448,8 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
         ClipRRect(
           borderRadius: BorderRadius.circular(6),
           child: LinearProgressIndicator(
-            value: progress.clamp(0.0, 1.0), minHeight: 5,
+            value: progress.clamp(0.0, 1.0),
+            minHeight: 5,
             backgroundColor: Colors.white12,
             valueColor: AlwaysStoppedAnimation<Color>(timerColor),
           ),
@@ -392,28 +458,29 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     );
   }
 
-  // PERF-1+2: Dot grid in its own RepaintBoundary. Each arrow in its own
-  // RepaintBoundary. Background never repaints during arrow animations.
+  // PERF-1+2: Grid builder — dot layer + per-arrow RepaintBoundary.
   Widget buildGrid(double cellSize, Set<(int, int)> shapeCells) {
     final occupiedCells = <(int, int)>{};
     for (final a in arrows) {
       if (!a.solved) {
-        for (final cell in a.cells) { occupiedCells.add(cell); }
+        for (final cell in a.cells) {
+          occupiedCells.add(cell);
+        }
       }
     }
 
     final dotRadius = (cellSize * 0.07).clamp(1.5, 4.0);
-    final gridSide  = cellSize * math.max(rows, cols);
+    final gridSide = cellSize * math.max(rows, cols);
 
     return Center(
       child: GestureDetector(
         onTapDown: (d) => onGridTap(d.localPosition, cellSize),
         behavior: HitTestBehavior.opaque,
         child: SizedBox(
-          width:  gridSide,
+          width: gridSide,
           height: gridSide,
           child: Stack(children: [
-            // PERF-2: Static dot layer — isolated in RepaintBoundary.
+            // PERF-2: Static dot layer.
             RepaintBoundary(
               child: CustomPaint(
                 size: Size(gridSide, gridSide),
@@ -426,7 +493,8 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
                 willChange: false,
               ),
             ),
-            // PERF-1: Each arrow in its own RepaintBoundary.
+            // PERF-1: One RepaintBoundary per arrow.
+            // Solved + non-animating arrows are skipped entirely (zero GPU cost).
             for (final a in arrows)
               if (!a.solved || animTrigger[a.id]!.value > 0)
                 _buildArrowVisual(a, cellSize),
@@ -443,34 +511,41 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
         // PERF-3: willChange only true while animating.
         final painter = CustomPaint(
           size: Size(cellSize * math.max(rows, cols),
-                     cellSize * math.max(rows, cols)),
+              cellSize * math.max(rows, cols)),
           painter: StraightArrowPainter(
-            segs: arrow.segs, escape: arrow.escape,
-            color: arrow.color, cellSize: cellSize,
+            segs: arrow.segs,
+            escape: arrow.escape,
+            color: arrow.color,
+            cellSize: cellSize,
           ),
           isComplex: true,
           willChange: val > 0,
         );
 
-        // PERF-1: Each arrow RepaintBoundary = GPU compositing layer.
         final bounded = RepaintBoundary(child: painter);
-
         if (val == 0) return bounded;
 
         final dist = math.max(rows, cols) * cellSize;
         final (dx, dy) = switch (arrow.escape) {
-          ArrowDir.up    => (0.0, -dist),
-          ArrowDir.down  => (0.0,  dist),
-          ArrowDir.left  => (-dist, 0.0),
-          ArrowDir.right => ( dist, 0.0),
+          ArrowDir.up => (0.0, -dist),
+          ArrowDir.down => (0.0, dist),
+          ArrowDir.left => (-dist, 0.0),
+          ArrowDir.right => (dist, 0.0),
         };
+
+        // FIX-2 / PERF-6: Adaptive durations — shorter on dense levels.
         return Animate(effects: [
           MoveEffect(
-            begin: Offset.zero, end: Offset(dx, dy),
-            duration: 350.ms, curve: Curves.easeOutCubic),
+              begin: Offset.zero,
+              end: Offset(dx, dy),
+              duration: _slideDuration,
+              curve: Curves.easeOutCubic),
           FadeEffect(
-            begin: 1.0, end: 0.0,
-            delay: 160.ms, duration: 190.ms, curve: Curves.easeOut),
+              begin: 1.0,
+              end: 0.0,
+              delay: _fadeDelay,
+              duration: _fadeDuration,
+              curve: Curves.easeOut),
         ], child: bounded);
       },
     );
@@ -498,12 +573,15 @@ class _GlassIconButton extends StatelessWidget {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
           child: Container(
-            width: 34, height: 34,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
               color: Colors.white.withAlpha(18),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.cyanAccent.withAlpha(55)),
-              boxShadow: [BoxShadow(color: Colors.cyanAccent.withAlpha(20), blurRadius: 8)],
+              boxShadow: [
+                BoxShadow(color: Colors.cyanAccent.withAlpha(20), blurRadius: 8)
+              ],
             ),
             child: Icon(icon, color: color, size: 18),
           ),
@@ -514,7 +592,6 @@ class _GlassIconButton extends StatelessWidget {
 }
 
 // ── _DotGridPainter ───────────────────────────────────────────────────────────
-// PERF-2: Dedicated static painter for the dot grid background layer.
 
 class _DotGridPainter extends CustomPainter {
   final Set<(int, int)> occupiedCells;
@@ -549,8 +626,8 @@ class _DotGridPainter extends CustomPainter {
 }
 
 // ── StraightArrowPainter ──────────────────────────────────────────────────────
-// HEAD-1: Apex locked to outer edge of head cell.
-// PERF-4: shouldRepaint compares segs by value.
+// FIX-1  HEAD-ALIGN: shaftTip offset so StrokeCap.round lands flush at apex.
+// PERF-4 shouldRepaint compares segs by value.
 
 class StraightArrowPainter extends CustomPainter {
   final List<BentCell> segs;
@@ -559,22 +636,23 @@ class StraightArrowPainter extends CustomPainter {
   final double cellSize;
 
   const StraightArrowPainter({
-    required this.segs, required this.escape,
-    required this.color, required this.cellSize,
+    required this.segs,
+    required this.escape,
+    required this.color,
+    required this.cellSize,
   });
 
   Offset _centre(BentCell c) =>
       Offset(c.col * cellSize + cellSize / 2, c.row * cellSize + cellSize / 2);
 
-  // HEAD-1: Tip = outer edge boundary of head cell.
   Offset _outerEdgeTip(BentCell headSeg) {
     final cx = headSeg.col * cellSize;
     final cy = headSeg.row * cellSize;
     return switch (escape) {
-      ArrowDir.up    => Offset(cx + cellSize / 2, cy),
-      ArrowDir.down  => Offset(cx + cellSize / 2, cy + cellSize),
-      ArrowDir.left  => Offset(cx,                cy + cellSize / 2),
-      ArrowDir.right => Offset(cx + cellSize,     cy + cellSize / 2),
+      ArrowDir.up => Offset(cx + cellSize / 2, cy),
+      ArrowDir.down => Offset(cx + cellSize / 2, cy + cellSize),
+      ArrowDir.left => Offset(cx, cy + cellSize / 2),
+      ArrowDir.right => Offset(cx + cellSize, cy + cellSize / 2),
     };
   }
 
@@ -598,71 +676,95 @@ class StraightArrowPainter extends CustomPainter {
     }
 
     final tail = _centre(tailSeg);
-    final tip  = _outerEdgeTip(headSeg);
+    final tip = _outerEdgeTip(headSeg); // apex — also passed to _drawHead
 
-    final shaft = Path()..moveTo(tail.dx, tail.dy)..lineTo(tip.dx, tip.dy);
+    // FIX-1 / HEAD-ALIGN:
+    // StrokeCap.round extends painted length by halfStroke beyond the
+    // endpoint. Without correction this overlaps the arrowhead triangle,
+    // creating a visible gap at the apex. Pull the shaft endpoint back so
+    // the cap's leading edge lands exactly at `tip`.
+    const double shaftStroke = 3.5;
+    const double halfCap = shaftStroke / 2.0;
+    final (dirX, dirY) = switch (escape) {
+      ArrowDir.up => (0.0, -1.0),
+      ArrowDir.down => (0.0, 1.0),
+      ArrowDir.left => (-1.0, 0.0),
+      ArrowDir.right => (1.0, 0.0),
+    };
+    final shaftTip = Offset(tip.dx - dirX * halfCap, tip.dy - dirY * halfCap);
 
-    // Glow layer.
-    canvas.drawPath(shaft, Paint()
-      ..color       = color.withAlpha(55)
-      ..strokeWidth = 7.5
-      ..style       = PaintingStyle.stroke
-      ..strokeCap   = StrokeCap.round
-      ..isAntiAlias = true
-      ..maskFilter  = const MaskFilter.blur(BlurStyle.normal, 4.0));
+    final shaft = Path()
+      ..moveTo(tail.dx, tail.dy)
+      ..lineTo(shaftTip.dx, shaftTip.dy);
+
+    // Glow.
+    canvas.drawPath(
+        shaft,
+        Paint()
+          ..color = color.withAlpha(55)
+          ..strokeWidth = 7.5
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..isAntiAlias = true
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0));
 
     // Crisp shaft.
-    canvas.drawPath(shaft, Paint()
-      ..color       = color
-      ..strokeWidth = 3.5
-      ..style       = PaintingStyle.stroke
-      ..strokeCap   = StrokeCap.round
-      ..isAntiAlias = true);
+    canvas.drawPath(
+        shaft,
+        Paint()
+          ..color = color
+          ..strokeWidth = shaftStroke
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..isAntiAlias = true);
 
-    _drawHead(canvas, tip, color);
+    _drawHead(canvas, tip, color); // head apex at original `tip`
   }
 
   void _drawHead(Canvas canvas, Offset tip, Color col) {
     final (dx, dy) = switch (escape) {
-      ArrowDir.up    => (0.0, -1.0),
-      ArrowDir.down  => (0.0,  1.0),
-      ArrowDir.left  => (-1.0, 0.0),
-      ArrowDir.right => ( 1.0, 0.0),
+      ArrowDir.up => (0.0, -1.0),
+      ArrowDir.down => (0.0, 1.0),
+      ArrowDir.left => (-1.0, 0.0),
+      ArrowDir.right => (1.0, 0.0),
     };
     final angle = math.atan2(dy, dx);
-
-    // Wing length scaled to cell, clamped for dense grids.
-    final len  = (cellSize * 0.55).clamp(6.0, 20.0);
+    final len = (cellSize * 0.55).clamp(6.0, 20.0);
     const wing = 0.48;
 
     final headPath = Path()
       ..moveTo(tip.dx, tip.dy)
       ..lineTo(tip.dx + math.cos(angle + math.pi - wing) * len,
-               tip.dy + math.sin(angle + math.pi - wing) * len)
+          tip.dy + math.sin(angle + math.pi - wing) * len)
       ..lineTo(tip.dx + math.cos(angle + math.pi + wing) * len,
-               tip.dy + math.sin(angle + math.pi + wing) * len)
+          tip.dy + math.sin(angle + math.pi + wing) * len)
       ..close();
 
-    canvas.drawPath(headPath, Paint()
-      ..color       = col.withAlpha(65)
-      ..style       = PaintingStyle.fill
-      ..isAntiAlias = true
-      ..maskFilter  = const MaskFilter.blur(BlurStyle.normal, 3.0));
+    canvas.drawPath(
+        headPath,
+        Paint()
+          ..color = col.withAlpha(65)
+          ..style = PaintingStyle.fill
+          ..isAntiAlias = true
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0));
 
-    canvas.drawPath(headPath, Paint()
-      ..color       = col
-      ..style       = PaintingStyle.fill
-      ..isAntiAlias = true);
+    canvas.drawPath(
+        headPath,
+        Paint()
+          ..color = col
+          ..style = PaintingStyle.fill
+          ..isAntiAlias = true);
   }
 
   @override
   bool hitTest(Offset position) => false;
 
-  // PERF-4: Value-based seg comparison.
   @override
   bool shouldRepaint(covariant StraightArrowPainter old) {
-    if (old.color != color || old.escape != escape ||
-        old.cellSize != cellSize || old.segs.length != segs.length) {
+    if (old.color != color ||
+        old.escape != escape ||
+        old.cellSize != cellSize ||
+        old.segs.length != segs.length) {
       return true;
     }
     for (int i = 0; i < segs.length; i++) {

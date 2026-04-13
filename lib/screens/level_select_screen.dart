@@ -1,18 +1,15 @@
 // lib/screens/level_select_screen.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// Level selection screen with:
-//   • Lock / unlock state persisted via LevelUnlockService
-//   • Animated unlock pulse when a new level is unlocked
-//   • Each card navigates to the correct GameScreenLvlX widget
+// CLEAN-LABELS: All shape-name labels (Heart, Circle, etc.) removed from
+//   both locked and unlocked cards. Cards now show only: level number,
+//   grid size, and difficulty badge — no shape text whatsoever.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-// Audio service — needed to stop music before returning to Login
 import '../services/audio_service.dart';
 
-// Level screen imports — one per level
 import '../levels/game_screen_lvl_1.dart';
 import '../levels/game_screen_lvl_2.dart';
 import '../levels/game_screen_lvl_3.dart';
@@ -24,7 +21,6 @@ import '../levels/game_screen_lvl_8.dart';
 import '../levels/game_screen_lvl_9.dart';
 import '../levels/game_screen_lvl_10.dart';
 
-// Service that handles persistent unlock state
 import '../services/level_unlock_service.dart';
 
 class LevelSelectScreen extends StatefulWidget {
@@ -35,30 +31,19 @@ class LevelSelectScreen extends StatefulWidget {
 }
 
 class _LevelSelectScreenState extends State<LevelSelectScreen> {
-  // Highest level the player may currently enter (1–10)
   int _highestUnlocked = 1;
-
-  // Level that was just newly unlocked (drives the reveal animation)
   int? _justUnlockedLevel;
-
-  // True while loading persisted data from storage
   bool _loading = true;
 
   // ── Static metadata ───────────────────────────────────────────────────────
 
-  // Display name for the shape of each level
-  static const List<String> _levelNames = [
-    'Heart', 'Circle', 'Triangle', 'Square', 'Pentagon',
-    'Hexagon', 'Heptagon', 'Shield', 'Nonagon', 'Cross',
-  ];
-
-  // Grid size label for each level
+  // Grid size label for each level (shape names intentionally removed).
   static const List<String> _levelGrids = [
     '8×8', '10×10', '11×11', '12×12', '13×13',
     '14×14', '15×15', '16×16', '17×17', '18×18',
   ];
 
-  // Accent colour for each level card
+  // Accent colour for each level card.
   static const List<Color> _levelColors = [
     Color(0xFF1E88E5), Color(0xFF00C853), Color(0xFFFFD600), Color(0xFFFFD600),
     Color(0xFFFF6D00), Color(0xFFFF6D00), Color(0xFFD50000), Color(0xFFD50000),
@@ -73,7 +58,6 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
     _loadUnlockState();
   }
 
-  // Reads highest unlocked level from SharedPreferences / Supabase
   Future<void> _loadUnlockState() async {
     final level = await LevelUnlockService.instance.loadHighestUnlocked();
     if (!mounted) return;
@@ -85,7 +69,6 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
 
   // ── Navigation helpers ────────────────────────────────────────────────────
 
-  // Returns the Widget for the given level number
   Widget _levelScreen(int level) {
     switch (level) {
       case 1:  return const GameScreenLvl1();
@@ -102,7 +85,6 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
     }
   }
 
-  // Opens a level and refreshes unlock state when the player returns
   Future<void> _openLevel(int level) async {
     await Navigator.push(
       context,
@@ -114,9 +96,8 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
     if (!mounted) return;
     setState(() {
       _highestUnlocked = updated;
-      if (updated > previous) _justUnlockedLevel = updated; // trigger anim
+      if (updated > previous) _justUnlockedLevel = updated;
     });
-    // Clear the animation marker after it finishes playing
     if (_justUnlockedLevel != null) {
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) setState(() => _justUnlockedLevel = null);
@@ -124,7 +105,6 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
     }
   }
 
-  // Maps level number to a difficulty string
   String _getDifficulty(int level) {
     if (level <= 2) return 'Easy';
     if (level <= 4) return 'Normal';
@@ -155,14 +135,11 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
-          // [FIX NAV] Stop all audio then pop back to Login/Home cleanly.
-          // Using pushNamedAndRemoveUntil clears the entire level/game stack,
-          // preventing the "double back" bug that exposed the login screen twice.
           onPressed: () {
             AudioService().stopAll();
             Navigator.of(context).pushNamedAndRemoveUntil(
               '/home',
-              (route) => false, // remove ALL routes beneath
+              (route) => false,
             );
           },
         ),
@@ -198,7 +175,6 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
     );
   }
 
-  // Decides whether to render a locked or unlocked card
   Widget _buildCard(BuildContext context, int level) {
     final color = _levelColors[level - 1];
     final unlocked = level <= _highestUnlocked;
@@ -208,7 +184,6 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
 
     Widget card = _unlockedCard(context, level, color, justUnlocked);
 
-    // Play elastic scale + shimmer animation on the newly unlocked card
     if (justUnlocked) {
       card = card
           .animate()
@@ -223,7 +198,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
     return card;
   }
 
-  // Greyed-out card with lock icon — not tappable
+  // CLEAN-LABELS: No shape name text. Shows only lock icon + level number.
   Widget _lockedCard(int level) {
     return Container(
       decoration: BoxDecoration(
@@ -251,18 +226,13 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                   color: Colors.white24,
                   fontWeight: FontWeight.bold,
                   height: 1.0)),
-          const SizedBox(height: 4),
-          Text(_levelNames[level - 1],
-              style: const TextStyle(fontSize: 11, color: Colors.white24),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
+          // No shape label — clean grid
         ],
       ),
     );
   }
 
-  // Coloured, tappable card for an unlocked level
+  // CLEAN-LABELS: No shape name text. Shows level number, grid size, difficulty.
   Widget _unlockedCard(
       BuildContext context, int level, Color color, bool highlighted) {
     return InkWell(
@@ -305,17 +275,15 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                     shadows: [
                       Shadow(color: color.withAlpha(180), blurRadius: 12)
                     ])),
-            const SizedBox(height: 3),
-            Text(_levelNames[level - 1],
-                style: const TextStyle(fontSize: 11, color: Colors.white70),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
+            // Grid size only — no shape name label
             Text(_levelGrids[level - 1],
-                style:
-                    TextStyle(fontSize: 10, color: Colors.white.withAlpha(100))),
-            const SizedBox(height: 5),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withAlpha(140),
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.5)),
+            const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(

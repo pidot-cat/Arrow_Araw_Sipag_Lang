@@ -29,7 +29,7 @@ class _State extends State<GameScreenLvl7> with BentLevelStateMixin<GameScreenLv
   @override int get levelNumber => 7;
   @override int get rows => Level7Manager.rows;
   @override int get cols => Level7Manager.cols;
-  @override int get arrowCount => Level7Manager.build().length;
+  @override int get arrowCount => 70;
   @override List<BentArrowData> Function() get buildArrowsFn => Level7Manager.build;
   @override Widget Function() get nextLevelBuilder =>
       () => const GameScreenLvl8();
@@ -43,7 +43,7 @@ class _State extends State<GameScreenLvl7> with BentLevelStateMixin<GameScreenLv
     final cellSize = dynamicCellSize(
       screenWidth: screenWidth,
       cols: Level7Manager.cols,
-      arrowCount: Level7Manager.build().length,
+      arrowCount: 70,
     );
     final shape = _allCells(rows, cols);
     return Scaffold(
@@ -52,7 +52,7 @@ class _State extends State<GameScreenLvl7> with BentLevelStateMixin<GameScreenLv
         SafeArea(child: Column(children: [
           buildHUD(),
           const SizedBox(height: 4),
-          Text('Solid Square · $rows×$cols · ${Level7Manager.build().length} Arrows',
+          Text('Solid Square · $rows×$cols · ${70} Arrows',
               style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12, letterSpacing: 1.1)),
           const SizedBox(height: 8),
           Expanded(child: Center(child: buildGrid(cellSize, shape))),

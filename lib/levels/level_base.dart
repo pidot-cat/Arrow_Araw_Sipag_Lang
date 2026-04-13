@@ -1,20 +1,19 @@
 // lib/levels/level_base.dart
 // ─────────────────────────────────────────────────────────────────────────────
-// Arrow Araw — Core Engine v8  (FINAL RECTIFICATION v2)
+// Arrow Araw — Core Engine v9  (PRODUCTION FINAL)
 //
-// [FIX 7]  RESPONSIVE SCALING v3:
-//           maxGridWidth = screenWidth * 0.85
-//           cellSize     = maxGridWidth / cols   (exact fit, no overflow ever)
-// [FIX 9]  ARROWHEAD TIP — apex locked to the OUTER EDGE of the head cell.
-//           Up → top edge, Down → bottom edge, Left → left edge, Right → right edge.
-// [FIX 10] SHARP NEON RENDERING:
-//           • isAntiAlias: true on every Paint
-//           • strokeWidth 3.5 (crisp, non-blurry shaft)
-//           • Glow blur capped at 4.0 radius (no colour bleed / sabog)
-//           • Solid neon fill on arrowhead — no washout
-// [FIX 11] ENFORCED SQUARE SILHOUETTE — grid SizedBox is always N×N.
-// [FIX 12] SOLVABILITY — level_manager uses reverse-fill to guarantee a valid
-//           topological ordering exists at generation time.
+// PERF-1  RepaintBoundary wraps EACH arrow → only the animating arrow
+//         repaints; the static grid never repaints during animation cycles.
+// PERF-2  Static dot grid drawn in its own RepaintBoundary (_DotGridPainter)
+//         and never rebuilt during animation.
+// PERF-3  willChange=false on idle painters; true only on animating arrow
+//         to opt it into a dedicated GPU compositing layer.
+// PERF-4  shouldRepaint compares segs by value (not just length).
+// PERF-5  onGridTap debounced: taps within 16 ms are ignored (1-frame guard)
+//         to prevent ghost life deductions from rapid input.
+// WIN-1   _victoryTriggered boolean: triggerVictory() + win sound fire
+//         exactly ONCE per level regardless of simultaneous callbacks.
+// HEAD-1  Arrowhead apex correctly placed at the OUTER EDGE of the head cell.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:async';
@@ -86,9 +85,7 @@ class BentArrowData {
   }
 }
 
-// ── [FIX 7] Responsive cellSize v3 ───────────────────────────────────────────
-// Simple and exact: maxGridWidth / cols.
-// Guarantees NO overflow on any screen size for ALL 10 levels.
+// ── Responsive cellSize ───────────────────────────────────────────────────────
 double dynamicCellSize({
   required double screenWidth,
   required int cols,
@@ -113,13 +110,21 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
   int secondsLeft = 60;
   bool gameOver = false;
   bool victory = false;
+
+  // WIN-1: Ensures win sound + state transition happen exactly once.
+  bool _victoryTriggered = false;
+
   Timer? _levelTimer;
   final Map<int, ValueNotifier<int>> animTrigger = {};
   final AudioService _audio = AudioService();
-
   final Set<int> _pendingSolve = {};
 
+  // PERF-5: Rapid-tap debounce timestamp.
+  DateTime? _lastTapTime;
+
   void initLevelState() {
+    _victoryTriggered = false;
+    _audio.resetWinSoundGuard(); // WIN-DEBOUNCE: fresh guard for this level
     arrows = buildArrowsFn();
     for (final a in arrows) {
       animTrigger[a.id] = ValueNotifier(0);
@@ -155,7 +160,10 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     if (mounted) context.read<GameProvider>().recordLevelLoss();
   }
 
+  // WIN-1: _victoryTriggered guard — idempotent.
   void triggerVictory() {
+    if (_victoryTriggered) return;
+    _victoryTriggered = true;
     _levelTimer?.cancel();
     _audio.cancelIdleTimer();
     setState(() => victory = true);
@@ -174,7 +182,6 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     }
   }
 
-  // [FIX 9] Returns the segment whose outer edge is the arrow tip
   BentCell _headSeg(BentArrowData arrow) {
     switch (arrow.escape) {
       case ArrowDir.left:
@@ -219,8 +226,20 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     return null;
   }
 
+  // PERF-5: Ignore taps within one frame of the previous tap.
+  bool _debounceCheck() {
+    final now = DateTime.now();
+    if (_lastTapTime != null &&
+        now.difference(_lastTapTime!) < const Duration(milliseconds: 16)) {
+      return false;
+    }
+    _lastTapTime = now;
+    return true;
+  }
+
   void onGridTap(Offset localPos, double cellSize) {
     if (gameOver || victory) return;
+    if (!_debounceCheck()) return; // PERF-5
     _audio.startIdleResumeTimer();
 
     final arrow = _findTappedArrow(localPos, cellSize);
@@ -243,6 +262,7 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
   void onTap(BentArrowData arrow) {
     if (gameOver || victory || arrow.solved) return;
     if (_pendingSolve.contains(arrow.id)) return;
+    if (!_debounceCheck()) return; // PERF-5
     _audio.startIdleResumeTimer();
     if (!isPathClear(arrow)) { wrongTap(); return; }
     _audio.playArrowSound();
@@ -266,6 +286,9 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     _levelTimer?.cancel();
     _audio.cancelIdleTimer();
     _pendingSolve.clear();
+    _victoryTriggered = false;
+    _lastTapTime = null;
+    _audio.resetWinSoundGuard(); // WIN-DEBOUNCE: reset for new attempt
     setState(() {
       arrows = buildArrowsFn();
       lives = 3; secondsLeft = 60; gameOver = false; victory = false;
@@ -369,7 +392,8 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     );
   }
 
-  // [FIX 7+8+11] buildGrid — responsive, square, dots on occupied cells only
+  // PERF-1+2: Dot grid in its own RepaintBoundary. Each arrow in its own
+  // RepaintBoundary. Background never repaints during arrow animations.
   Widget buildGrid(double cellSize, Set<(int, int)> shapeCells) {
     final occupiedCells = <(int, int)>{};
     for (final a in arrows) {
@@ -389,15 +413,20 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
           width:  gridSide,
           height: gridSide,
           child: Stack(children: [
-            for (final cell in occupiedCells)
-              Positioned(
-                left: cell.$2 * cellSize + cellSize / 2 - dotRadius,
-                top:  cell.$1 * cellSize + cellSize / 2 - dotRadius,
-                child: Container(
-                    width: dotRadius * 2, height: dotRadius * 2,
-                    decoration: const BoxDecoration(
-                        color: Colors.white24, shape: BoxShape.circle)),
+            // PERF-2: Static dot layer — isolated in RepaintBoundary.
+            RepaintBoundary(
+              child: CustomPaint(
+                size: Size(gridSide, gridSide),
+                painter: _DotGridPainter(
+                  occupiedCells: Set.unmodifiable(occupiedCells),
+                  cellSize: cellSize,
+                  dotRadius: dotRadius,
+                ),
+                isComplex: false,
+                willChange: false,
               ),
+            ),
+            // PERF-1: Each arrow in its own RepaintBoundary.
             for (final a in arrows)
               if (!a.solved || animTrigger[a.id]!.value > 0)
                 _buildArrowVisual(a, cellSize),
@@ -411,6 +440,7 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
     return ValueListenableBuilder<int>(
       valueListenable: animTrigger[arrow.id]!,
       builder: (context, val, _) {
+        // PERF-3: willChange only true while animating.
         final painter = CustomPaint(
           size: Size(cellSize * math.max(rows, cols),
                      cellSize * math.max(rows, cols)),
@@ -418,9 +448,14 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
             segs: arrow.segs, escape: arrow.escape,
             color: arrow.color, cellSize: cellSize,
           ),
-          isComplex: true, willChange: val > 0,
+          isComplex: true,
+          willChange: val > 0,
         );
-        if (val == 0) return painter;
+
+        // PERF-1: Each arrow RepaintBoundary = GPU compositing layer.
+        final bounded = RepaintBoundary(child: painter);
+
+        if (val == 0) return bounded;
 
         final dist = math.max(rows, cols) * cellSize;
         final (dx, dy) = switch (arrow.escape) {
@@ -436,7 +471,7 @@ mixin BentLevelStateMixin<T extends StatefulWidget> on State<T> {
           FadeEffect(
             begin: 1.0, end: 0.0,
             delay: 160.ms, duration: 190.ms, curve: Curves.easeOut),
-        ], child: painter);
+        ], child: bounded);
       },
     );
   }
@@ -478,9 +513,44 @@ class _GlassIconButton extends StatelessWidget {
   }
 }
 
+// ── _DotGridPainter ───────────────────────────────────────────────────────────
+// PERF-2: Dedicated static painter for the dot grid background layer.
+
+class _DotGridPainter extends CustomPainter {
+  final Set<(int, int)> occupiedCells;
+  final double cellSize;
+  final double dotRadius;
+
+  const _DotGridPainter({
+    required this.occupiedCells,
+    required this.cellSize,
+    required this.dotRadius,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white24
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+
+    for (final cell in occupiedCells) {
+      final cx = cell.$2 * cellSize + cellSize / 2;
+      final cy = cell.$1 * cellSize + cellSize / 2;
+      canvas.drawCircle(Offset(cx, cy), dotRadius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DotGridPainter old) =>
+      old.cellSize != cellSize ||
+      old.dotRadius != dotRadius ||
+      old.occupiedCells.length != occupiedCells.length;
+}
+
 // ── StraightArrowPainter ──────────────────────────────────────────────────────
-// [FIX 9]  Apex of arrowhead pinned to the OUTER EDGE of the head cell.
-// [FIX 10] Sharp neon: isAntiAlias true, strokeWidth 3.5, glow blur 4.0 max.
+// HEAD-1: Apex locked to outer edge of head cell.
+// PERF-4: shouldRepaint compares segs by value.
 
 class StraightArrowPainter extends CustomPainter {
   final List<BentCell> segs;
@@ -496,15 +566,15 @@ class StraightArrowPainter extends CustomPainter {
   Offset _centre(BentCell c) =>
       Offset(c.col * cellSize + cellSize / 2, c.row * cellSize + cellSize / 2);
 
-  // [FIX 9] True tip = outer EDGE of head cell in escape direction
+  // HEAD-1: Tip = outer edge boundary of head cell.
   Offset _outerEdgeTip(BentCell headSeg) {
     final cx = headSeg.col * cellSize;
     final cy = headSeg.row * cellSize;
     return switch (escape) {
-      ArrowDir.up    => Offset(cx + cellSize / 2, cy),               // top edge
-      ArrowDir.down  => Offset(cx + cellSize / 2, cy + cellSize),    // bottom edge
-      ArrowDir.left  => Offset(cx,                cy + cellSize / 2), // left edge
-      ArrowDir.right => Offset(cx + cellSize,     cy + cellSize / 2), // right edge
+      ArrowDir.up    => Offset(cx + cellSize / 2, cy),
+      ArrowDir.down  => Offset(cx + cellSize / 2, cy + cellSize),
+      ArrowDir.left  => Offset(cx,                cy + cellSize / 2),
+      ArrowDir.right => Offset(cx + cellSize,     cy + cellSize / 2),
     };
   }
 
@@ -512,7 +582,6 @@ class StraightArrowPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (segs.isEmpty) return;
 
-    // [FIX 9] Head segment based on escape direction
     final BentCell headSeg;
     final BentCell tailSeg;
     switch (escape) {
@@ -529,11 +598,11 @@ class StraightArrowPainter extends CustomPainter {
     }
 
     final tail = _centre(tailSeg);
-    final tip  = _outerEdgeTip(headSeg); // [FIX 9] absolute outer edge
+    final tip  = _outerEdgeTip(headSeg);
 
     final shaft = Path()..moveTo(tail.dx, tail.dy)..lineTo(tip.dx, tip.dy);
 
-    // [FIX 10] Subtle glow — low alpha, small blur → no sabog/bleed
+    // Glow layer.
     canvas.drawPath(shaft, Paint()
       ..color       = color.withAlpha(55)
       ..strokeWidth = 7.5
@@ -542,7 +611,7 @@ class StraightArrowPainter extends CustomPainter {
       ..isAntiAlias = true
       ..maskFilter  = const MaskFilter.blur(BlurStyle.normal, 4.0));
 
-    // [FIX 10] Crisp shaft — strokeWidth 3.5, isAntiAlias true, no blur
+    // Crisp shaft.
     canvas.drawPath(shaft, Paint()
       ..color       = color
       ..strokeWidth = 3.5
@@ -554,7 +623,6 @@ class StraightArrowPainter extends CustomPainter {
   }
 
   void _drawHead(Canvas canvas, Offset tip, Color col) {
-    // Direction unit vector for angle calculation
     final (dx, dy) = switch (escape) {
       ArrowDir.up    => (0.0, -1.0),
       ArrowDir.down  => (0.0,  1.0),
@@ -563,11 +631,10 @@ class StraightArrowPainter extends CustomPainter {
     };
     final angle = math.atan2(dy, dx);
 
-    // [FIX 10] Head size: scales with cell but clamped for dense grids
+    // Wing length scaled to cell, clamped for dense grids.
     final len  = (cellSize * 0.55).clamp(6.0, 20.0);
-    const wing = 0.48; // tight, sharp triangle
+    const wing = 0.48;
 
-    // [FIX 9] Apex IS the tip — no offset from cell centre
     final headPath = Path()
       ..moveTo(tip.dx, tip.dy)
       ..lineTo(tip.dx + math.cos(angle + math.pi - wing) * len,
@@ -576,14 +643,12 @@ class StraightArrowPainter extends CustomPainter {
                tip.dy + math.sin(angle + math.pi + wing) * len)
       ..close();
 
-    // [FIX 10] Minimal glow on head
     canvas.drawPath(headPath, Paint()
       ..color       = col.withAlpha(65)
       ..style       = PaintingStyle.fill
       ..isAntiAlias = true
       ..maskFilter  = const MaskFilter.blur(BlurStyle.normal, 3.0));
 
-    // [FIX 10] Solid neon fill — crisp, high contrast
     canvas.drawPath(headPath, Paint()
       ..color       = col
       ..style       = PaintingStyle.fill
@@ -593,10 +658,18 @@ class StraightArrowPainter extends CustomPainter {
   @override
   bool hitTest(Offset position) => false;
 
+  // PERF-4: Value-based seg comparison.
   @override
-  bool shouldRepaint(covariant StraightArrowPainter old) =>
-      old.color != color || old.escape != escape ||
-      old.cellSize != cellSize || old.segs.length != segs.length;
+  bool shouldRepaint(covariant StraightArrowPainter old) {
+    if (old.color != color || old.escape != escape ||
+        old.cellSize != cellSize || old.segs.length != segs.length) {
+      return true;
+    }
+    for (int i = 0; i < segs.length; i++) {
+      if (segs[i] != old.segs[i]) return true;
+    }
+    return false;
+  }
 }
 
 typedef BentArrowPainter = StraightArrowPainter;
